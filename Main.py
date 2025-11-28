@@ -57,7 +57,7 @@ def extract_face_frames( video, target_size =(224, 224), output_video_path: str 
         ret, frame = video.read()
         if not ret:
             break
-        
+
         frame_count += 1
 
         # Downsampling temporale, per selezionare solo 1 frame ogni 'frame_step' frames
@@ -74,6 +74,14 @@ def extract_face_frames( video, target_size =(224, 224), output_video_path: str 
             for det in results.detections:
                 # Ottengo le coordinate della box del volto
                 x1, y1, x2, y2 = extract_face_box(det, frame)
+
+                # BISOGNA AGGIUNGERE UN CONTROLLO, SE LE COORDINATE SONO TROPPO DISTANTI DA QUELLE ESTRATTE DAL 
+                # PRECEDENTE ALLORA VA SCARTATO IL FRAM -> SIGNIFICA CHE POTREBBE AVER ESTRATTO MALE IL VOLTO
+                # OPPURE dovremmo fare la media di tutte le coordinate ed escludere quelli troppi distanti dalla media -> in questo modo garantiamo una maggiore stabilità però se il soggetto 
+                # si muove tanto potrebbe essere complesso :(
+                
+
+
                 # Ritaglio il frame intorno al volto
                 face_crop = frame[y1:y2, x1:x2]
                 # Scala di grigi
@@ -92,8 +100,6 @@ def extract_face_frames( video, target_size =(224, 224), output_video_path: str 
     face_detection.close()
     out_video.release()
 
-
-
 # Funzione per l'estrazione della traccia audio da un video
 def audioExtraction( videoPath: str ):
     # Create directory for audio analysis if it doesn't exist
@@ -110,7 +116,7 @@ def audioExtraction( videoPath: str ):
     return audio, video
 
 
-VIDEO_FILE = r"CampioniVideo/redditi.mp4"
+VIDEO_FILE = r"CampioniVideo/silvio.mp4"
 
 if __name__ == "__main__":
 
