@@ -2,7 +2,9 @@ import os
 import torch
 import librosa
 import numpy as np
-from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor
+from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor, AutoTokenizer
+
+BERT_MODEL_ID = "dbmdz/bert-base-italian-uncased"   #oppure "bert-base-multilingual-cased"
 
 AUDIO_FILE = r"C:/Users/aless/OneDrive/Desktop/AiSpeech/testvideo.mp4"
 LANGUAGE = "it"                     
@@ -82,7 +84,7 @@ def transcribe_whisper(
 
     return transcription
 
-
+#effettua trascrizione con timestamps
 def transcribe_whisper_with_chunks(
     model,
     processor,
@@ -154,6 +156,43 @@ def transcribe_whisper_with_chunks(
 
     return segments
 
+#Tokenizza i testi dei segmenti con BERT
+def tokenize_segments_with_bert(
+    segments,
+    bert_model_id: str = BERT_MODEL_ID,
+    max_length: int = 128,
+):
+    """
+    Ritorna:
+      - tokenizer: l'oggetto AutoTokenizer
+      - encodings: un dict con input_ids, attention_mask, ecc. (shape: [num_segments, max_length])
+    """
+    # prendi solo il testo non vuoto
+    texts = [s["text"].strip() for s in segments if s["text"].strip()]
+
+    if not texts:
+        print("[WARN] Nessun testo valido nei segmenti da tokenizzare.")
+        return None, None
+
+    print(f"[INFO] Tokenizzo {len(texts)} segmenti con BERT ({bert_model_id})...")
+
+    #si prende un modello pretrainato di BERT
+    tokenizer = AutoTokenizer.from_pretrained(bert_model_id)
+
+    encodings = tokenizer(
+        texts,
+        padding=True,            # padding a lunghezza massima del batch
+        truncation=True,         # tronca se supera max_length
+        max_length=max_length,
+        return_tensors="pt",     # tensori PyTorch
+    )
+
+    print("[INFO] Tokenizzazione completata.")
+    print(f"  input_ids shape: {encodings['input_ids'].shape}")
+    print(f"  attention_mask shape: {encodings['attention_mask'].shape}")
+
+    return tokenizer, encodings
+
 
 if __name__ == "__main__":
     print("=== CARICO MODELLO WHISPER LARGE V3 (NO PIPELINE) ===")
@@ -172,3 +211,16 @@ if __name__ == "__main__":
 print("\n=== SEGMENTI ===")
 for s in segments:
     print(f"[{s['start']:.2f} - {s['end']:.2f}] {s['text']}")
+
+tokenizer, encodings = tokenize_segments_with_bert(segments)
+
+if tokenizer is not None:
+    #output tokenizzazione per debug
+
+    first_input_ids = encodings["input_ids"][0]
+    print("\n=== ESEMPIO TOKENIZZAZIONE PRIMO SEGMENTO ===")
+    for token_id in first_input_ids:
+        token = tokenizer.convert_ids_to_tokens(int(token_id))
+        print(f"  Token ID: {token_id.item():>5}  -->  Token: {token}")
+
+    
