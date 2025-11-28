@@ -53,39 +53,33 @@ def rotate_image(image, angle, center=None, scale=1.0):
     return rotated
 
 # Funzione per allineare il volto orizzontalmente basandosi sugli occhi
-def align_face(frame):
+def align_face(frame, face_mesh):
+    rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    res = face_mesh.process(rgb)
 
-    mp_face_mesh = mp.solutions.face_mesh
+    if not res.multi_face_landmarks:
+        return frame
 
-    with mp_face_mesh.FaceMesh(static_image_mode=True,
-                               max_num_faces=1,
-                               refine_landmarks=True,
-                               min_detection_confidence=0.5) as face_mesh:
+    landmarks = res.multi_face_landmarks[0]
+    ih, iw, _ = frame.shape
 
-        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        res = face_mesh.process(rgb)
+    left_eye = landmarks.landmark[33] # occhio sx
+    right_eye = landmarks.landmark[263] # occhio dx
 
-        if not res.multi_face_landmarks:
-            return frame  # Nessun volto -> restituisce l'immagine originale
+    x1, y1 = int(left_eye.x * iw), int(left_eye.y * ih)
+    x2, y2 = int(right_eye.x * iw), int(right_eye.y * ih)
 
-        landmarks = res.multi_face_landmarks[0]
+    # Calcolo angolo tra occhi
+    angle = np.degrees(np.arctan2(y2 - y1, x2 - x1))
 
-        ih, iw, _ = frame.shape
+    # Filtra angoli estremi
+    if abs(angle) > 30:
+        return frame
 
-        # Landmark occhi
-        left_eye = landmarks.landmark[33]   # Occhio sx
-        right_eye = landmarks.landmark[263] # Occhio dx
-
-        x1, y1 = int(left_eye.x * iw), int(left_eye.y * ih)
-        x2, y2 = int(right_eye.x * iw), int(right_eye.y * ih)
-
-        # Calcolo angolo 
-        angle = np.degrees(np.arctan2(y2 - y1, x2 - x1))
-
-        # Ruota per allineare gli occhi orizzontalmente
-        aligned = rotate_image(frame, -angle, center=( (x1+x2)//2, (y1+y2)//2 ))
-
-        return aligned
+    # Ruota attorno al centro degli occhi
+    center = ((x1 + x2) // 2, (y1 + y2) // 2)
+    aligned = rotate_image(frame, -angle, center=center)
+    return aligned
 
 
 # Funzione per estrarre i singoli frame in scala di grigio con volto dal video e crea anche un video sempre in scala di grigio
@@ -102,12 +96,21 @@ def extract_face_frames(video, target_size=(224, 224), output_video_path: str = 
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     out_video = cv2.VideoWriter(output_video_path, fourcc, 30, target_size, isColor=False)
 
+    # Inizializzazione MediaPipe FaceMesh per allineamento
+    mp_face_mesh = mp.solutions.face_mesh
+    face_mesh = mp_face_mesh.FaceMesh(static_image_mode=True,
+                                      max_num_faces=1,
+                                      refine_landmarks=True,
+                                      min_detection_confidence=0.5)
+
     frame_count = 0
     saved_count = 0
 
-    # Estrai frame rate del video e calcola frame_step custom
-    fps = video.get(cv2.CAP_PROP_FPS)
-    frame_step = int(fps // 10)  
+    fps = 0
+    if not frame_step:
+        # Estrai frame rate del video e calcola frame_step custom
+        fps = video.get(cv2.CAP_PROP_FPS)
+        frame_step = int(fps // 5)  
 
     # CLAHE per normalizzazione
     clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
@@ -119,12 +122,14 @@ def extract_face_frames(video, target_size=(224, 224), output_video_path: str = 
 
         frame_count += 1
 
-        # Downsampling
+        # Downsampling -> da capire se crea problemi nel momento che si cerca di fare la fusione delle analisi testo, audio e video
+        #                 dobbiamo tenere traccia ogni quanti frame stiamo pescando in modo da capire i chunk temporali del video
+        # Salta i frame in base a frame_step    
         if frame_count % frame_step != 0:
             continue
 
         # Allineamento del volto
-        aligned_frame = align_face(frame)
+        aligned_frame = align_face(frame, face_mesh)
 
         # Face detection sul frame allineato
         rgb_frame = cv2.cvtColor(aligned_frame, cv2.COLOR_BGR2RGB)
