@@ -136,6 +136,12 @@ def extract_face_frames(video, target_size=(224, 224), output_video_path: str = 
         results = face_detection.process(rgb_frame)
 
         if results.detections:
+            for detection in results.detections:
+                score = detection.score[0]   # confidenza tra 0 e 1 -> utile per filtrare i frame in cui si è rilevato il volto ma MediPipe non era veramente sicuro 
+                #print("Confidence:", score)
+
+
+        if results.detections:
             for det in results.detections:
                 # Estrazione coordinate bounding box sul frame allineato
                 x1, y1, x2, y2 = extract_face_box(det, aligned_frame)
@@ -163,7 +169,7 @@ def extract_face_frames(video, target_size=(224, 224), output_video_path: str = 
 
                 # Salvataggio immagine
                 saved_count += 1
-                cv2.imwrite(f"{output_folder}/face_{saved_count:04d}.jpg", resized)
+                #cv2.imwrite(f"{output_folder}/face_{saved_count:04d}.jpg", resized)
 
                 # Salvataggio video risultatnte dal down sampling, grayscale, normalizzazione e ritaglio volto
                 out_video.write(resized)
