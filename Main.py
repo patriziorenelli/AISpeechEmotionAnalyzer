@@ -179,7 +179,6 @@ def extract_face_frames(video, target_size=(224, 224), output_video_path: str = 
     return frame_step, fps
 
 
-
 # Funzione per l'estrazione della traccia audio da un video
 def audioExtraction( videoPath: str ):
     # Create directory for audio analysis if it doesn't exist
@@ -196,7 +195,7 @@ def audioExtraction( videoPath: str ):
     return audio, video
 
 
-VIDEO_FILE = r"CampioniVideo/redditi.mp4"
+VIDEO_FILE = r"CampioniVideo/example_RAVDESS.mp4"
 
 if __name__ == "__main__":
 
