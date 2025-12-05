@@ -1,0 +1,29 @@
+{
+    "General": {
+        "AppName": "AI Speech Emotion Analyzer",
+        "Version": "1.0.0",
+        "DebugMode": true
+    },
+    "Preprocessing": {
+        "Audio":{
+
+        },
+        "Text": {
+
+        },
+        "Video": {
+
+        }
+    },
+    "Pipelines": {
+        "Audio":{
+
+        },
+        "Text": {
+
+        },
+        "Video": {
+
+        }
+    }
+}
