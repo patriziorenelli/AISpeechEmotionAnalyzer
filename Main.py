@@ -208,3 +208,21 @@ if __name__ == "__main__":
     print("Nuovo video salvato")
 
 
+"""
+1- Scarichiamo il dataset da hugging 
+2- Prep del dataset da caricare su hugging:
+    - Creare un json per ogni video, con nome video, emozione generale e  con le info per i vari time slot: valid o invalid 
+    - Dividiamo il video in time slot: time slot da 1 secondo
+    - scala di grigio ecc
+    - verificare se c'è la faccia ->  
+        se c'è: salviamo il frame in una struttura per ogni time slot, dove si salva il nome del frame per identificare time slot e frame nello slot, valore del frame, lo score del riconoscimento facciale 
+        se non c'è: lo scartiamo 
+    - verifichiamo per ogni time slot quanti frame abbiamo salvato
+    - se sono più di x (il valore usato nel down sampling): si selezionano quelli che hanno score più alto nel riconosciamento facciale
+    - se sono meno di x: li prendiamo tutti 
+    - se non ce ne sta nessuno: salviamo in json che il  time slot non è valido e lo skippiamo nella futura analisi visisiva
+
+3- Carichiamo il dataset su huggingface
+4- Fare la pipeline vera e propria
+"""
+
