@@ -34,7 +34,7 @@ class Utils:
 
     def map_labels_to_ekman_mapping(self, df: pd.DataFrame) -> pd.DataFrame:
         # Leggo l'ekman mapping dal file ekman_mapping.json
-        with open(self.config["PATH"]["ekman_mapping_file"], "r", encoding="utf-8") as f:
+        with open(self.config["Paths"]["ekman_mapping_file"], "r", encoding="utf-8") as f:
             ekman_mapping = dict(json.load(f))
         
         # Mappa le etichette del dataset GoEmotions a quelle di Ekman
@@ -44,7 +44,7 @@ class Utils:
                 small_to_big[small_name] = big_emo
 
         # Leggo la lista delle emozione del dataset GoEmotions
-        with open(self.config["PATH"]["emotion_file"], "r", encoding="utf-8") as f:
+        with open(self.config["Paths"]["emotion_file"], "r", encoding="utf-8") as f:
             emotions = [line.strip() for line in f if line.strip()]
 
         df["label"] = df["label"].apply(lambda i: emotions[i])
@@ -78,11 +78,11 @@ class Utils:
 
     def hp_space(self, trial):
         return {
-            "learning_rate": trial.suggest_float("learning_rate", self.config.getfloat("HP_SEARCH", "min_learning_rate"), self.config.getfloat("HP_SEARCH", "max_learning_rate"), log=True),
+            "learning_rate": trial.suggest_float("learning_rate", self.config["HP_SEARCH"]["min_learning_rate"], self.config["HP_SEARCH"]["max_learning_rate"], log=True),
             "per_device_train_batch_size": trial.suggest_categorical("per_device_train_batch_size", json.loads(self.config["HP_SEARCH"]["per_device_train_batch_size"])),
-            "num_train_epochs": trial.suggest_int("num_train_epochs", self.config.getint("HP_SEARCH", "min_num_epochs"), self.config.getint("HP_SEARCH", "max_num_epochs")),
-            "warmup_ratio": trial.suggest_float("warmup_ratio", self.config.getfloat("HP_SEARCH", "min_warmup_ratio"), self.config.getfloat("HP_SEARCH", "max_warmup_ratio")),
-            "weight_decay": trial.suggest_float("weight_decay", self.config.getfloat("HP_SEARCH", "min_weight_decay"), self.config.getfloat("HP_SEARCH", "max_weight_decay")),
+            "num_train_epochs": trial.suggest_int("num_train_epochs", self.config["HP_SEARCH"]["min_num_epochs"], self.config["HP_SEARCH"]["max_num_epochs"]),
+            "warmup_ratio": trial.suggest_float("warmup_ratio", self.config["HP_SEARCH"]["min_warmup_ratio"], self.config["HP_SEARCH"]["max_warmup_ratio"]),
+            "weight_decay": trial.suggest_float("weight_decay", self.config["HP_SEARCH"]["min_weight_decay"], self.config["HP_SEARCH"]["max_weight_decay"]),
             "lr_scheduler_type": trial.suggest_categorical(
                 "lr_scheduler_type", json.loads(self.config["HP_SEARCH"]["scheduler_type"])
             )
@@ -91,7 +91,7 @@ class Utils:
     def setup_logger(self) -> logging.Logger:
         logger = logging.getLogger(__name__)
 
-        loglevel = self.config["LOGGER"]["level"]
+        loglevel = self.config["Logger"]["level"]
         numeric_level = getattr(logging, loglevel.upper(), None)
 
         if not isinstance(numeric_level, int):
@@ -102,8 +102,8 @@ class Utils:
         # Evita duplicati
         if not logger.handlers:
             formatter = logging.Formatter(
-                fmt=self.config["LOGGER"]["format"],
-                datefmt=self.config["LOGGER"]["date_format"]
+                fmt=self.config["Logger"]["format"],
+                datefmt=self.config["Logger"]["date_format"]
             )
 
             # Console
@@ -112,7 +112,7 @@ class Utils:
             logger.addHandler(console_handler)
 
             # File (se richiesto)
-            log_file_name = self.config["LOGGER"].get("log_file_name")
+            log_file_name = self.config["Logger"]["log_file_name"]
 
             if log_file_name is not None:
                 file_handler = logging.FileHandler(log_file_name)
