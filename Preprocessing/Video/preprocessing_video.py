@@ -1,4 +1,5 @@
 import cv2
+import datasets
 
 def frame_generator(video_path, fps_target=None):
     cap = cv2.VideoCapture(video_path)
@@ -58,5 +59,26 @@ def preprocessing_video(video_path: str) -> int:
     
     return i
 
-print(preprocessing_video(r"D:/Magistrale/Sapienza/ComputerScience/Advanced Machine Learning/AISpeechAnalyzer/AISpeechEmotionAnalyzer/testvideo.mp4"))
+#print(preprocessing_video(r"D:/Magistrale/Sapienza/ComputerScience/Advanced Machine Learning/AISpeechAnalyzer/AISpeechEmotionAnalyzer/testvideo.mp4"))
 
+'''
+from datasets import load_dataset
+from huggingface_hub import login
+
+login(token="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")
+
+ds = load_dataset(
+    "PiantoDiGruppo/AMLDataset2",
+    split="train",
+    streaming=True
+)
+
+for row in ds:
+    print(row) 
+    break  # processa una riga alla volta
+'''
+
+import torch
+print("Versione Torch:", torch.__version__)
+print("CUDA disponibile:", torch.cuda.is_available())
+print("CUDA version:", torch.version.cuda)
