@@ -309,7 +309,7 @@ def extract_face_frames_HuggingVersion(video, video_name="video", target_size=(2
             break
 
         frame_count += 1
-
+        print()
         # Downsampling -> da capire se crea problemi nel momento che si cerca di fare la fusione delle analisi testo, audio e video
         #                 dobbiamo tenere traccia ogni quanti frame stiamo pescando in modo da capire i chunk temporali del video
         # Salta i frame in base a frame_step    
@@ -388,9 +388,9 @@ def audioExtraction( videoPath: str ):
     return audio, video
 
 
-VIDEO_FILE = "prove/prep-train/analysing_video.mp4"
 REPO_ID = "PiantoDiGruppo/AMLDataset2"
 video_list = get_file_list_names(REPO_ID)
+VIDEO_FILE = "Prove/prep-train/" + video_list[0].split("/")[1]
 download_single_video_from_hug(REPO_ID, video_list[0], VIDEO_FILE)
 
 #VIDEO_FILE = "CampioniVideo/example_RAVDESS.mp4"
@@ -400,8 +400,6 @@ if __name__ == "__main__":
     #audioExtraction( VIDEO_FILE )
     # Apro il video 
     video = cv2.VideoCapture(VIDEO_FILE)
-
-
     frame_step= extract_face_frames_HuggingVersion( video, video_name=VIDEO_FILE )
     video.release()
 
