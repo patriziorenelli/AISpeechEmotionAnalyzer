@@ -309,9 +309,7 @@ def extract_face_frames_HuggingVersion(video, video_name="video", target_size=(2
             break
 
         frame_count += 1
-        print()
-        # Downsampling -> da capire se crea problemi nel momento che si cerca di fare la fusione delle analisi testo, audio e video
-        #                 dobbiamo tenere traccia ogni quanti frame stiamo pescando in modo da capire i chunk temporali del video
+
         # Salta i frame in base a frame_step    
         if frame_count % frame_step != 0:
             continue
@@ -340,8 +338,8 @@ def extract_face_frames_HuggingVersion(video, video_name="video", target_size=(2
                 # PRECEDENTE ALLORA VA SCARTATO IL FRAM -> SIGNIFICA CHE POTREBBE AVER ESTRATTO MALE IL VOLTO 
                 # OPPURE dovremmo fare la media di tutte le coordinate ed escludere quelli troppi distanti dalla media -> 
                 #       in questo modo garantiamo una maggiore stabilità però se il soggetto # si muove tanto potrebbe essere complesso :(
-
-
+                # OPPURE usare lo score all'interno di detection per capire quanto è sicura la rilevazione del volto nel frame
+            
                 # Ritaglio del volto dal frame allineato
                 face_crop = aligned_frame[y1:y4, x1:x4]
 
