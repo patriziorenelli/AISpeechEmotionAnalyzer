@@ -1,2 +1,4 @@
 Models/*
 Tokenizers/*
+__pycache__/
+Logs/execution.log
