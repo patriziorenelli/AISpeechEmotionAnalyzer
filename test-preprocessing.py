@@ -4,7 +4,7 @@ import cv2
 import mediapipe as mp
 import time
 import numpy as np
-from datasetPreProcessing import *
+from  utils import *
 import json
 
 """
@@ -275,32 +275,45 @@ def extract_face_frames_WITHOUT_downsampling(video, target_size=(224, 224), outp
 
 # DOVREBBE FUNZIONARE BENE MA MANCA FILE JSON CON nome file, emozione generale, elenco time slot con key:valid/unvalid e per ognuno i frame validi 
 def extract_face_frames_HuggingVersion(video, video_name="video", target_size=(224, 224), frame_step: int = 10, output_folder="Prove/prep-train/face_frames_extracted"):
+
     os.makedirs(output_folder, exist_ok=True)
 
     # Cartella base del video
     video_base_folder = os.path.join(output_folder, os.path.splitext(os.path.basename(video_name))[0])
     os.makedirs(video_base_folder, exist_ok=True)
 
-    # Inizializzazione MediaPipe per face detection
+    # Creazione json per info 
+    json_content = {
+        "file_name": video_base_folder,
+        "emotion": video_base_folder.split("-")[2],
+        "time_slot": [ ]  } 
+
+# Dizionario temporaneo: ts → lista frame salvati
+    time_slot_frames = {}
+
+    # Inizializzazione MediaPipe Face Detection
     mp_face_detection = mp.solutions.face_detection
     face_detection = mp_face_detection.FaceDetection(min_detection_confidence=0.5)
 
-    # Inizializzazione MediaPipe FaceMesh per allineamento
+    # FaceMesh
     mp_face_mesh = mp.solutions.face_mesh
-    face_mesh = mp_face_mesh.FaceMesh(static_image_mode=True,
-                                      max_num_faces=1,
-                                      refine_landmarks=True,
-                                      min_detection_confidence=0.5)
+    face_mesh = mp_face_mesh.FaceMesh(
+        static_image_mode=True, 
+        max_num_faces=1, 
+        refine_landmarks=True, 
+        min_detection_confidence=0.5
+    )
+
     frame_count = 0
     saved_count = 0
 
-    fps = int( video.get(cv2.CAP_PROP_FPS) )
-    if not frame_step:
-        # Estrai frame rate del video e calcola frame_step custom
-        fps = video.get(cv2.CAP_PROP_FPS)
-        frame_step = int(fps // 5)  
+    fps = int(video.get(cv2.CAP_PROP_FPS))
 
-    # CLAHE per normalizzazione
+    if not frame_step:
+        frame_step = max(1, int(fps // 5))
+    print(frame_step)
+
+    # CLAHE
     clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
 
     while True:
@@ -310,63 +323,75 @@ def extract_face_frames_HuggingVersion(video, video_name="video", target_size=(2
 
         frame_count += 1
 
-        # Salta i frame in base a frame_step    
+        # Skip in base al frame_step
         if frame_count % frame_step != 0:
             continue
 
-        # Allineamento del volto
         aligned_frame = align_face(frame, face_mesh)
-
-        # Face detection sul frame allineato
         rgb_frame = cv2.cvtColor(aligned_frame, cv2.COLOR_BGR2RGB)
         results = face_detection.process(rgb_frame)
 
-        if results.detections:
-            for detection in results.detections:
-                score = detection.score[0]   # confidenza tra 0 e 1 -> utile per filtrare i frame in cui si è rilevato il volto ma MediPipe non era veramente sicuro 
-                #print("Confidence:", score)
-
+        # Calcolo time-slot attuale
+        time_slot = (frame_count - 1) // fps + 1
 
         if results.detections:
+
             for det in results.detections:
-                # Estrazione coordinate bounding box sul frame allineato
-              
-                x1, y1,x4,y4 = extract_face_box(det, aligned_frame)
+                x1, y1, x4, y4 = extract_face_box(det, aligned_frame)
 
-               
-                # BISOGNA AGGIUNGERE UN CONTROLLO, SE LE COORDINATE SONO TROPPO DISTANTI DA QUELLE ESTRATTE DAL 
-                # PRECEDENTE ALLORA VA SCARTATO IL FRAM -> SIGNIFICA CHE POTREBBE AVER ESTRATTO MALE IL VOLTO 
-                # OPPURE dovremmo fare la media di tutte le coordinate ed escludere quelli troppi distanti dalla media -> 
-                #       in questo modo garantiamo una maggiore stabilità però se il soggetto # si muove tanto potrebbe essere complesso :(
-                # OPPURE usare lo score all'interno di detection per capire quanto è sicura la rilevazione del volto nel frame
-            
-                # Ritaglio del volto dal frame allineato
                 face_crop = aligned_frame[y1:y4, x1:x4]
-
                 if face_crop.size == 0:
-                    continue  # sicurezza in caso di bbox errati
+                    continue
 
-                # Scala di grigi
                 gray = cv2.cvtColor(face_crop, cv2.COLOR_BGR2GRAY)
-
-                # Normalizzazione CLAHE
                 gray = clahe.apply(gray)
-
-                # Resize
                 resized = cv2.resize(gray, target_size)
-                print(str(frame_count-1) + " " + (str(fps)))
-                time_slot = (frame_count - 1) // fps + 1
 
-                #frame_in_ts = (frame_count - 1) % fps
+                # Nome file
+                file_name = f"face_ts{time_slot}_fr{frame_count}.jpg"
+                full_path = os.path.join(video_base_folder, file_name)
 
-                # Salvataggio immagine
+                cv2.imwrite(full_path, resized)
                 saved_count += 1
-                file_name = os.path.join(video_base_folder, f"face_ts{time_slot}_fr{frame_count}.jpg")
-                cv2.imwrite(file_name, resized)
+
+                # Inserimento nel dizionario temporaneo
+                if time_slot not in time_slot_frames:
+                    time_slot_frames[time_slot] = []
+
+                time_slot_frames[time_slot].append(file_name)
+
         else:
             print(f"No face detected at frame {frame_count}")
 
     face_detection.close()
+
+    # --- CREAZIONE FINALE DEL JSON ---
+    total_ts = ((frame_count - 1) // fps) + 1
+
+    for ts in range(1, total_ts + 1):
+        if ts in time_slot_frames:
+            frames = time_slot_frames[ts]
+            json_content["time_slot"].append({
+                "ts": ts,
+                "valid": True,
+                "frames": frames
+            })
+        else:
+            # Time-slot senza frame → invalid
+            json_content["time_slot"].append({
+                "ts": ts,
+                "valid": False,
+                "frames": []
+            })
+
+    # Salvataggio JSON
+    json_path = os.path.join(video_base_folder, "info.json")
+    with open(json_path, "w") as f:
+        json.dump(json_content, f, indent=4)
+
+    print(f"\nJSON creato in: {json_path}")
+    print("Time-slot trovati:", len(time_slot_frames))
+
     return fps
 
 
@@ -385,11 +410,15 @@ def audioExtraction( videoPath: str ):
     video.close()
     return audio, video
 
+config = json.load(open("config.json"))
+utils = Utils(config=config)
 
 REPO_ID = "PiantoDiGruppo/AMLDataset2"
-video_list = get_file_list_names(REPO_ID)
+video_list = utils.get_file_list_names("PiantoDiGruppo/AMLDataset2")
 VIDEO_FILE = "Prove/prep-train/" + video_list[0].split("/")[1]
-download_single_video_from_hug(REPO_ID, video_list[0], VIDEO_FILE)
+utils.download_single_video_from_hug(REPO_ID, video_list[0], VIDEO_FILE)
+
+#VIDEO_FILE = "CampioniVideo/01-01-01-01-example_RAVDESS.mp4"
 
 #VIDEO_FILE = "CampioniVideo/example_RAVDESS.mp4"
 if __name__ == "__main__":
