@@ -1,10 +1,13 @@
 import datasets
 from transformers import AutoTokenizer, TrainingArguments, Trainer
 
-from AiSpeechEmotionAnalyzer.logs.LoggerCallback import LoggerCallback
-from AiSpeechEmotionAnalyzer.utils import Utils
+from Logs.LoggerCallback import LoggerCallback
+from Preprocessing.Testo.meld_preprocessing import preprocess_meld_dataset
+from Utilities.utils import Utils
 
 import os
+
+from Preprocessing.Testo.goemotion_preprocessing import preprocess_goemotion_dataset
 
 def train(model_name: str, dataset_name: str, utils: Utils):
     # Preprocessing
@@ -20,13 +23,16 @@ def train(model_name: str, dataset_name: str, utils: Utils):
     # Preprocessing 
     logger.info(f"Preprocessing del dataset di addestramento: {dataset_name}")
 
-    if dataset_name == "RAVDESS":
-        df_train = preprocess_ravdess_dataset(split_name='train', n_samples=n_sample_train, exclude_neutral=exclude_neutral, utils=utils)
-        df_eval = preprocess_ravdess_dataset(split_name='validation', n_samples=n_sample_val, exclude_neutral=exclude_neutral, utils=utils)
+    if dataset_name == "GOEMOTIONS":
+        df_train = preprocess_goemotion_dataset(split_name='train', n_samples=n_sample_train, exclude_neutral=exclude_neutral, utils=utils)
+        df_eval = preprocess_goemotion_dataset(split_name='validation', n_samples=n_sample_val, exclude_neutral=exclude_neutral, utils=utils)
 
         # Mappa le etichette a quelle di Ekman
         df_train = utils.map_labels_to_ekman_mapping(df_train)
         df_eval = utils.map_labels_to_ekman_mapping(df_eval)
+    elif dataset_name == "MELD":
+        df_train = preprocess_meld_dataset(split_name='train', n_samples=n_sample_train, exclude_neutral=exclude_neutral, utils=utils)
+        df_eval = preprocess_meld_dataset(split_name='dev', n_samples=n_sample_val, exclude_neutral=exclude_neutral, utils=utils)
     else:
         logger.error(f"Unknown dataset: {dataset_name}")
         raise ValueError(f"Unknown dataset name: {dataset_name}")

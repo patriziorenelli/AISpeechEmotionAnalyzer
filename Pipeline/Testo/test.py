@@ -2,7 +2,9 @@ import os
 from transformers import AutoTokenizer, TrainingArguments, Trainer
 import datasets
 
-from AiSpeechEmotionAnalyzer.utils import Utils
+from Utilities.utils import Utils
+from Preprocessing.Testo.goemotion_preprocessing import preprocess_goemotion_dataset
+from Preprocessing.Testo.meld_preprocessing import preprocess_meld_dataset
 
 
 def test(model_name: str, dataset_name_train: str, dataset_name_test: str, utils: Utils):
@@ -17,7 +19,17 @@ def test(model_name: str, dataset_name_train: str, dataset_name_test: str, utils
 
     # Preprocessing 
     logger.info(f"Preprocessing del dataset di test: {dataset_name_test}")
-    if dataset_name_test == "RAVDESS":
+
+    if dataset_name_test == "GOEMOTIONS":
+        df_test = preprocess_goemotion_dataset(split_name='test', n_samples=n_sample_test, exclude_neutral=exclude_neutral, utils=utils)
+
+        # Mappa le etichette a quelle di Ekman
+        df_test = utils.map_labels_to_ekman_mapping(df_test)
+
+    elif dataset_name_test == "MELD":
+        df_test = preprocess_meld_dataset(split_name='test', n_samples=n_sample_test, exclude_neutral=exclude_neutral, utils=utils)
+    
+    elif dataset_name_test == "RAVDESS":
         df_test = preprocess_ravdess_dataset(split_name='test', n_samples=n_sample_test, exclude_neutral=exclude_neutral, utils=utils)
 
         # Mappa le etichette a quelle di Ekman

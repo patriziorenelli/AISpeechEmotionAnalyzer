@@ -20,10 +20,10 @@ class Utils:
 
     def __init__(self, config: dict):
         self.config = config
-        self.accuracy = evaluate.load(self.config["METRICS"]["accuracy"])
-        self.f1 = evaluate.load(self.config["METRICS"]["f1"])
-        self.precision = evaluate.load(self.config["METRICS"]["precision"])
-        self.recall = evaluate.load(self.config["METRICS"]["recall"])
+        self.accuracy = evaluate.load(self.config["Metrics"]["accuracy"])
+        self.f1 = evaluate.load(self.config["Metrics"]["f1"])
+        self.precision = evaluate.load(self.config["Metrics"]["precision"])
+        self.recall = evaluate.load(self.config["Metrics"]["recall"])
 
     def build_label_encoder(self, df_train: pd.DataFrame) -> LabelEncoder:
         le = LabelEncoder()

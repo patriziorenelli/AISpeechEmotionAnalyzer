@@ -4,6 +4,16 @@
         "Version": "1.0.0",
         "DebugMode": true
     },
+    "Dataset": {
+        "Ravdess": {
+            "dataset_name": "PiantoDiGruppo/AMLDataset2",
+            "split_names": {
+                "train": "train",
+                "val": "validation",
+                "test": "test"
+            }
+        }
+    },
     "Preprocessing": {
         "Audio":{
 
