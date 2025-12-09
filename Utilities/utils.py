@@ -174,7 +174,7 @@ class Utils:
 
         return model
     
-    def download_single_video_from_hug(repo_id, video_path_in_repo, output_file):
+    def download_single_video_from_hug(self, repo_id, video_path_in_repo, output_file):
         # Scarica il file
         local_path = hf_hub_download(
             repo_id=repo_id,
@@ -186,8 +186,7 @@ class Utils:
 
         print(f"Video salvato come {output_file}")
 
-
-    def get_file_list_names(repo_id):
+    def get_file_list_names(self, repo_id):
         # Ottieni la lista di tutti i file nel repo
         files = list_repo_files(repo_id=repo_id, repo_type="dataset")
         # Filtra quelli nella cartella train

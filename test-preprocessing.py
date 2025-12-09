@@ -4,7 +4,7 @@ import cv2
 import mediapipe as mp
 import time
 import numpy as np
-from  utils import *
+from  Utilities.utils import *
 import json
 
 """
