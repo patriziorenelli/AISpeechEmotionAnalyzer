@@ -8,7 +8,8 @@ from huggingface_hub import list_repo_files, hf_hub_download
 import evaluate
 import numpy as np
 from sklearn.calibration import LabelEncoder
-from transformers import EvalPrediction, PreTrainedTokenizerBase, AutoModelForSequenceClassification, XLNetForSequenceClassification
+import torch
+from transformers import AutoModelForSpeechSeq2Seq, EvalPrediction, PreTrainedTokenizerBase, AutoModelForSequenceClassification, XLNetForSequenceClassification
 import pandas as pd
 
 class Utils:
@@ -123,12 +124,14 @@ class Utils:
                 logger.addHandler(file_handler)
         return logger
 
-    def load_model(self, model_name: str, num_labels: int, model_path:str=None) -> AutoModelForSequenceClassification | XLNetForSequenceClassification:
-        if model_path is None:
-            model_path = self.config[model_name]["model_name"]
-
-        if model_name == "XLNET":
+    def load_model(self, model_name: str, num_labels: int, model_path:str=None) -> AutoModelForSequenceClassification | XLNetForSequenceClassification | AutoModelForSpeechSeq2Seq:
+        logger = self.setup_logger()
+        
+        if model_name == "Xlnet":
             try:
+                if model_path is None:
+                    model_path = self.config["Pipelines"]["Text"]["Models"][model_name]["model_name"]
+
                 # Proviamo a caricare normalmente
                 model = XLNetForSequenceClassification.from_pretrained(
                     model_path,
@@ -136,8 +139,8 @@ class Utils:
                 )
             except RuntimeError as e:
                 if "size mismatch" in str(e):
-                    print(
-                        f"[WARNING] Mismatch nei pesi del modello "
+                    logger.warning(
+                        f"Mismatch nei pesi del modello "
                         f"(checkpoint con un numero diverso di classi). "
                         f"Ricarico con `ignore_mismatched_sizes=True`..."
                     )
@@ -148,8 +151,11 @@ class Utils:
                     )
                 else:
                     raise e
-        elif model_name == "EMOBERTA" or model_name == "DISTILBERT":
+        elif model_name == "Emoberta" or model_name == "Distilbert":
             try:
+                if model_path is None:
+                    model_path = self.config["Pipelines"]["Text"]["Models"][model_name]["model_name"]
+
                 # Proviamo a caricare normalmente
                 model = AutoModelForSequenceClassification.from_pretrained(
                     model_path,
@@ -157,24 +163,59 @@ class Utils:
                 )
             except RuntimeError as e:
                 if "size mismatch" in str(e):
-                    print(
-                        f"[WARNING] Mismatch nei pesi del modello "
+                    logger.warning(
+                        f"Mismatch nei pesi del modello "
                         f"(checkpoint con un numero diverso di classi). "
                         f"Ricarico con `ignore_mismatched_sizes=True`..."
                     )
                     model = AutoModelForSequenceClassification.from_pretrained(
-                        self.config[model_name]["model_name"],
+                        model_path,
                         num_labels=num_labels,
                         ignore_mismatched_sizes=True
                     )
                 else:
                     raise e
+        elif model_name == "Whisper":
+            try:
+                if model_path is None:
+                    model_path = self.config["Preprocessing"]["Text"]["Model"]["model_id"]
+
+                device = "cuda:0" if torch.cuda.is_available() else "cpu"
+                torch_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
+
+                # Proviamo a caricare normalmente
+                model = AutoModelForSpeechSeq2Seq.from_pretrained(
+                    model_path,
+                    torch_dtype=torch_dtype,
+                    low_cpu_mem_usage=True,
+                    use_safetensors=True,
+                ).to(device)
+
+            except RuntimeError as e:
+                if "size mismatch" in str(e):
+                    logger.warning(
+                        f"Mismatch nei pesi del modello "
+                        f"(checkpoint con un numero diverso di classi). "
+                        f"Ricarico con `ignore_mismatched_sizes=True`..."
+                    )
+                    model = AutoModelForSpeechSeq2Seq.from_pretrained(
+                        model_path,
+                        torch_dtype=torch_dtype,
+                        low_cpu_mem_usage=True,
+                        use_safetensors=True,
+                        ignore_mismatched_sizes=True
+                    )
+                else:
+                    raise e
+
         else:
             raise ValueError(f"Unknown model name: {model_name}")
 
         return model
     
     def download_single_video_from_hug(self, repo_id, video_path_in_repo, output_file):
+        logger = self.setup_logger()
+
         # Scarica il file
         local_path = hf_hub_download(
             repo_id=repo_id,
@@ -184,7 +225,7 @@ class Utils:
         # Copia (o sposta) il file nella destinazione finale
         shutil.copy(local_path, output_file)  # se vuoi rimuovere il file originale, usa shutil.move()
 
-        print(f"Video salvato come {output_file}")
+        logger.info(f"Video salvato come {output_file}")
 
     def get_file_list_names(self, repo_id):
         # Ottieni la lista di tutti i file nel repo
