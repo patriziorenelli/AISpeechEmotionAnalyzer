@@ -288,7 +288,7 @@ def extract_face_frames_HuggingVersion(video, video_name="video", target_size=(2
         "emotion": video_base_folder.split("-")[2],
         "time_slot": [ ]  } 
 
-# Dizionario temporaneo: ts → lista frame salvati
+    # Dizionario temporaneo: ts → lista frame salvati
     time_slot_frames = {}
 
     # Inizializzazione MediaPipe Face Detection

@@ -18,7 +18,7 @@ class TranscriptionManager:
 
         logger.info(f"Device: {device}, Dtype: {torch_dtype}")
 
-        model = self.utils.load_model(model_id)
+        model = self.utils.load_model("Whisper")
 
         processor = AutoProcessor.from_pretrained(model_id)
 
@@ -95,7 +95,7 @@ class TranscriptionManager:
     ):
         logger = self.utils.setup_logger()
 
-        audio_array, sr = self.load_audio_as_array(audio_path, self.utils.config["Pipelines"]["Text"]["Model"]["target_sr"])
+        audio_array, sr = self.load_audio_as_array(audio_path, self.utils.config["Preprocessing"]["Text"]["Model"]["target_sr"])
 
         logger.info("Preparo input per il modello...")
 

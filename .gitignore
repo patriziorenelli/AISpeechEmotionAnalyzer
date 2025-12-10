@@ -2,3 +2,5 @@ Models/*
 Tokenizers/*
 __pycache__/
 Logs/execution.log
+tmp_video.mp4
+AudioAnalysis/originalAudio.wav

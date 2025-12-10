@@ -13,6 +13,14 @@
                 "test": "test"
             }
         },
+        "Omgdataset": {
+            "dataset_name": "PiantoDiGruppo/OMGEmotion_AML",
+            "split_names": {
+                "train": "train",
+                "val": "validation",
+                "test": "test"
+            }
+        },
         "Goemotions": {
             "dataset_path": "goemotion",
             "dataset_name": "simplified",
@@ -39,7 +47,7 @@
             "Model": {
                 "model_id": "openai/whisper-large-v3",
                 "target_sr": 16000,
-                "language": "it"
+                "language": "en"
             }
 
         },
