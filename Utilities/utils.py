@@ -2,6 +2,8 @@ import json
 import logging
 import sys
 import shutil
+import os
+import moviepy as movie
 
 
 from huggingface_hub import list_repo_files, hf_hub_download
@@ -213,7 +215,10 @@ class Utils:
 
         return model
     
-    def download_single_video_from_hug(self, repo_id, video_path_in_repo, output_file):
+    def download_single_video_from_hug(self, repo_id, video_path_in_repo, output_file_path):
+
+        os.makedirs(output_file_path, exist_ok=True)
+        
         logger = self.setup_logger()
 
         # Scarica il file
@@ -222,10 +227,12 @@ class Utils:
             filename=video_path_in_repo,
             repo_type="dataset"
         )
+        #print("QUI: " + output_file)
+        
         # Copia (o sposta) il file nella destinazione finale
-        shutil.copy(local_path, output_file)  # se vuoi rimuovere il file originale, usa shutil.move()
+        shutil.copy(local_path, output_file_path)  # se vuoi rimuovere il file originale, usa shutil.move()
 
-        logger.info(f"Video salvato come {output_file}")
+        logger.info(f"Video salvato come {output_file_path}")
 
     def get_file_list_names(self, repo_id):
         # Ottieni la lista di tutti i file nel repo
@@ -241,3 +248,32 @@ class Utils:
         #  se n < soglia li prendiamo tutti + frame neri? 
         #  se n = 0 tutti frame neri ?    
     
+    # Data la lista dei nomi dei file contenuti in  Ravdness crea un json di info, con la traduzione delle emozioni nel formato di OMGEmotion
+    def create_ravdness_json(self, video_list):
+        emotion = { 1: 4, 2: 4, 3:3, 4: 5, 5: 0, 6:2, 7: 1, 8 : 6}
+
+        diz = []
+        for x in video_list:
+            em = x.split("-")[2]
+
+            print("emozione" + x.split("-")[2] + " conversione " + str(emotion[int(em)]))
+            subset = x.split("/")[0]
+            riga = {"video": x.replace(subset +"/", "" ), "EmotionMaxVote": emotion[int(em)]}
+            diz.append(riga)
+
+        json_path = os.path.join( "info.json")
+        with open(json_path, "w") as f:
+            json.dump(diz, f, indent=4)
+
+    # Funzione per l'estrazione della traccia audio da un video
+    def audioExtraction(self, videoPath: str, output_path: str ):
+        os.makedirs(output_path, exist_ok=True)
+        # Load the video file
+        video = movie.VideoFileClip(videoPath)
+        # Extract audio from the video
+        audio = video.audio
+        # Save the audio file
+        audio_file_path = os.path.join(output_path, "originalAudio.wav")
+        audio.write_audiofile(audio_file_path)
+        audio.close()
+        video.close()

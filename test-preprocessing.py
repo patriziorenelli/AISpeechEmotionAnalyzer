@@ -2,7 +2,6 @@ import os
 import moviepy as movie
 import cv2
 import mediapipe as mp
-import time
 import numpy as np
 from  Utilities.utils import *
 import json
@@ -46,7 +45,6 @@ def extract_face_box(detection, frame, margin=50):
 
 
     return x1, y1,x4,y4
-
 
 # Funzione per ruotare l'immagine attorno ad un centro specifico 
 def rotate_image(image, angle, center=None, scale=1.0):
@@ -274,12 +272,13 @@ def extract_face_frames_WITHOUT_downsampling(video, target_size=(224, 224), outp
 
 
 # DOVREBBE FUNZIONARE BENE MA MANCA FILE JSON CON nome file, emozione generale, elenco time slot con key:valid/unvalid e per ognuno i frame validi 
-def extract_face_frames_HuggingVersion(video, video_name="video", target_size=(224, 224), frame_step: int = 10, output_folder="Prove/prep-train/face_frames_extracted"):
+def extract_face_frames_HuggingVersion(video, video_name="video", target_size=(224, 224), frame_step: int = 10, output_folder: str ="Prove/prep-train/face_frames_extracted"):
 
     os.makedirs(output_folder, exist_ok=True)
 
     # Cartella base del video
     video_base_folder = os.path.join(output_folder, os.path.splitext(os.path.basename(video_name))[0])
+    print(video_base_folder)
     os.makedirs(video_base_folder, exist_ok=True)
 
     # Creazione json per info 
@@ -396,15 +395,15 @@ def extract_face_frames_HuggingVersion(video, video_name="video", target_size=(2
 
 
 # Funzione per l'estrazione della traccia audio da un video
-def audioExtraction( videoPath: str ):
+def audioExtraction( videoPath: str, output_path):
     # Create directory for audio analysis if it doesn't exist
-    os.makedirs("AudioAnalisis", exist_ok=True)
+    os.makedirs(output_path, exist_ok=True)
     # Load the video file
     video = movie.VideoFileClip(videoPath)
     # Extract audio from the video
     audio = video.audio
     # Save the audio file
-    audio_file_path = os.path.join("AudioAnalisis", "originalAudio.wav")
+    audio_file_path = os.path.join(output_path, "originalAudio.wav")
     audio.write_audiofile(audio_file_path)
     audio.close()
     video.close()
@@ -416,7 +415,7 @@ utils = Utils(config=config)
 REPO_ID = "PiantoDiGruppo/AMLDataset2"
 video_list = utils.get_file_list_names("PiantoDiGruppo/AMLDataset2")
 VIDEO_FILE = "Prove/prep-train/" + video_list[0].split("/")[1]
-utils.download_single_video_from_hug(REPO_ID, video_list[0], VIDEO_FILE)
+#utils.download_single_video_from_hug(REPO_ID, video_list[0], VIDEO_FILE)
 
 #VIDEO_FILE = "CampioniVideo/01-01-01-01-example_RAVDESS.mp4"
 
@@ -424,11 +423,11 @@ utils.download_single_video_from_hug(REPO_ID, video_list[0], VIDEO_FILE)
 if __name__ == "__main__":
 
     #print("=== ESTRAZIONE AUDIO DA VIDEO ===")
-    #audioExtraction( VIDEO_FILE )
+    audioExtraction( "CompletePipeline/-0SfjYsrUjE.mp4/Video/-0SfjYsrUjE.mp4", "CompletePipeline/-0SfjYsrUjE.mp4/Audio" )
     # Apro il video 
-    video = cv2.VideoCapture(VIDEO_FILE)
-    frame_step= extract_face_frames_HuggingVersion( video, video_name=VIDEO_FILE )
-    video.release()
+    #video = cv2.VideoCapture(VIDEO_FILE)
+    #frame_step= extract_face_frames_HuggingVersion( video, video_name=VIDEO_FILE )
+    #video.release()
 
 
 """
