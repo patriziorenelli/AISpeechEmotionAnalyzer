@@ -146,9 +146,22 @@ class PreprocessingVideo:
                         if face_crop.size == 0:
                             continue
 
-                        gray = cv2.cvtColor(face_crop, cv2.COLOR_BGR2GRAY)
-                        gray = clahe.apply(gray)
-                        resized = cv2.resize(gray, target_size)
+                        #DeepFace ha usato immagini RGB per l'addestramento quindi meglio usarle senza scala di grigi
+                        #gray = cv2.cvtColor(face_crop, cv2.COLOR_BGR2GRAY)
+                        #gray = clahe.apply(gray)
+                        #resized = cv2.resize(gray, target_size)
+
+
+                        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+                        # Converti in LAB, applica CLAHE solo al canale L, poi torna a BGR
+                        lab = cv2.cvtColor(face_crop, cv2.COLOR_BGR2LAB)
+                        l, a, b = cv2.split(lab)
+                        l_clahe = clahe.apply(l)
+                        lab_clahe = cv2.merge((l_clahe, a, b))
+                        enhanced = cv2.cvtColor(lab_clahe, cv2.COLOR_LAB2BGR)
+
+                        # ridimensiona all'input richiesto
+                        resized = cv2.resize(enhanced, target_size)
 
                         # Nome file
                         file_name = f"face_ts{time_slot}_fr{frame_count}.jpg"
