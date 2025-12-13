@@ -9,7 +9,6 @@ class EmotionExtractor:
     
     # Analizza le emozioni di un singolo frame
     def extractFaceEmotion(self, frame, return_all=True): # se return_all = True ritorna tutte le probabilità delle emozioni
-
         
         try:
             result = DeepFace.analyze( frame, actions=['emotion'], enforce_detection=False )

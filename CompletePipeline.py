@@ -7,9 +7,11 @@ import json
 from PIL import Image
 from Pipeline.Video.EmotionExtractor import *
 
+
 # Questo codice è compatibile sia con Ravdess che OMGEmotion
 if __name__ == "__main__":
-    utils = Utils(config=json.load(open("config.json")))
+    config = json.load(open("config.json"))
+    utils = Utils(config)
     REPO_ID = "PiantoDiGruppo/Ravdess_AML"
     #REPO_ID = "PiantoDiGruppo/OMGEmotion_AML"
     name_list = utils.get_file_list_names(REPO_ID)
@@ -21,7 +23,7 @@ if __name__ == "__main__":
         if "json" not in  video_name:
 
             vid_name = video_name.split("/")[1]
-            general_path = BASE_PATH +  "/" +  vid_name
+            general_path = config["Paths"]["base_path"] +  "/" +  vid_name
             visual_file_path = general_path + "/Video"  
 
             utils.download_single_video_from_hug(REPO_ID, video_name, visual_file_path )
@@ -49,6 +51,7 @@ if __name__ == "__main__":
 
                 # Analizziamo i singoli time slot 
                 for slot in dati['time_slot']:
+                    # ci sta il campo valid dentro -> usare quello 
 
                     if len(slot['frames']) != 0:
                         print(f"TS: {slot['ts']}")
@@ -67,7 +70,7 @@ if __name__ == "__main__":
                             #print(all_detected_emotion)
 
                             for k, v in all_detected_emotion.items():
-                                    total[k] += v
+                                total[k] += v
 
                         # TODO Qui calcola per ogni emozione la somma dei suoi score diviso il numero di frame analizzati 
                         average = {k: total[k] / frames_number for k in total}
@@ -86,7 +89,9 @@ if __name__ == "__main__":
 
 
             # --------------------------------------------------------------------------------------------------
+            # FARE: cancellazione cartella e creazione di un file json con nome video, i singoli time slot e sezione video, testo, audio e per ogni time slot json emozioni
+
 
             # elimina la cartella con tutti i file creati
-            shutil.rmtree(BASE_PATH) 
+            #shutil.rmtree(BASE_PATH) 
             #break # messo per limitare il numero di file da analizzare durante la fase di sviluppo 

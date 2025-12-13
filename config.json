@@ -153,7 +153,8 @@
         "ekman_mapping_file": "./Utilities/ekman_mapping.json",
         "models_dir": "./Models",
         "tokenizers_dir": "./Tokenizers",
-        "log_dir": "./Logs"
+        "log_dir": "./Logs",
+        "base_path": "CompletePipeline"
     },
     "Logger":{
         "level": "info",
