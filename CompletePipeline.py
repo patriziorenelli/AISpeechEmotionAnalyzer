@@ -160,6 +160,6 @@ if __name__ == "__main__":
             shutil.rmtree(general_path)
 
             # per fermare l'esecuzione quando facciamo test
-            if vid_name == "1v6f9b2KMRA.mp4":
-               break
+            #if vid_name == "1v6f9b2KMRA.mp4":
+            #   break
 
