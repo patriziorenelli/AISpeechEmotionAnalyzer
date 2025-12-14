@@ -2,7 +2,8 @@
     "General": {
         "AppName": "AI Speech Emotion Analyzer",
         "Version": "1.0.0",
-        "DebugMode": true
+        "DebugMode": true,
+        "temp_audio_name": "originalAudio.wav"
     },
     "Dataset": {
         "Ravdess": {
@@ -15,6 +16,7 @@
         },
         "Omgdataset": {
             "dataset_name": "PiantoDiGruppo/OMGEmotion_AML",
+            "label_column_name": "EmotionMaxVote",
             "split_names": {
                 "train": "train",
                 "val": "validation",
@@ -49,7 +51,6 @@
                 "target_sr": 16000,
                 "language": "en"
             }
-
         },
         "Video": {
             "frame_step":5
@@ -154,8 +155,11 @@
         "models_dir": "./Models",
         "tokenizers_dir": "./Tokenizers",
         "log_dir": "./Logs",
+        "omgdataset_metadata_file": "./Utilities/Metadata/omg_dataset_metadata.csv",
         "base_path": "CompletePipeline",
-        "complete_info_path": "CompletePipeline/complete_info.json"
+        "complete_info_path": "CompletePipeline/complete_info.json",
+        "ekman_emotion_labels_file": "./Utilities/emotions_ekman.txt",
+        "all_emotion_labels_file": "./Utilities/emotions_all.txt"
     },
     "Logger":{
         "level": "info",

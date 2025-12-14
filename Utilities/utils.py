@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 import sys
 import shutil
 import os
@@ -37,6 +38,13 @@ class Utils:
         logger.info("Label mapping: %s", dict(zip(le.classes_, range(len(le.classes_)))))
         
         return le
+
+    def get_num_labels_for_dataset(self, dataset: pd.DataFrame, label_column_name: str = "label") -> int:
+        logger = self.setup_logger()
+        unique_labels = dataset[label_column_name].unique()
+        num_labels = len(unique_labels)
+        logger.info(f"Numero di etichette uniche nel dataset: {num_labels}")
+        return num_labels
 
     def map_labels_to_ekman_mapping(self, df: pd.DataFrame) -> pd.DataFrame:
         # Leggo l'ekman mapping dal file ekman_mapping.json
@@ -126,7 +134,7 @@ class Utils:
                 logger.addHandler(file_handler)
         return logger
 
-    def load_model(self, model_name: str, num_labels: int, model_path:str=None) -> AutoModelForSequenceClassification | XLNetForSequenceClassification | AutoModelForSpeechSeq2Seq:
+    def load_model(self, model_name: str, num_labels: int=0, model_path:str=None) -> AutoModelForSequenceClassification | XLNetForSequenceClassification | AutoModelForSpeechSeq2Seq:
         logger = self.setup_logger()
         
         if model_name == "Xlnet":
@@ -188,7 +196,7 @@ class Utils:
                 # Proviamo a caricare normalmente
                 model = AutoModelForSpeechSeq2Seq.from_pretrained(
                     model_path,
-                    torch_dtype=torch_dtype,
+                    dtype=torch_dtype,
                     low_cpu_mem_usage=True,
                     use_safetensors=True,
                 ).to(device)
@@ -216,9 +224,9 @@ class Utils:
         return model
     
     def download_single_video_from_hug(self, repo_id, video_path_in_repo, output_file_path):
-
+       
         os.makedirs(output_file_path, exist_ok=True)
-        
+      
         logger = self.setup_logger()
 
         # Scarica il file
@@ -240,7 +248,6 @@ class Utils:
         # Filtra quelli nella cartella train
         train_files = [f for f in files if f.startswith("train/")]
         return train_files
-
 
         # vediamo numero di frame con viso 
         #  se n > soglia down sampling allora peschiamo gli x con prob più alta
@@ -273,7 +280,27 @@ class Utils:
         # Extract audio from the video
         audio = video.audio
         # Save the audio file
-        audio_file_path = os.path.join(output_path, "originalAudio.wav")
+        audio_file_path = os.path.join(output_path, self.config["General"]["temp_audio_name"])
         audio.write_audiofile(audio_file_path)
         audio.close()
         video.close()
+
+    def get_emotion_ekman_labels(self) -> list[str]:
+        with open(self.config["Paths"]["ekman_emotion_labels_file"], "r", encoding="utf-8") as f:
+            ekman_emotion_labels = [line.strip() for line in f if line.strip()]
+        return ekman_emotion_labels
+    
+    def infer_emotion_columns(self, df, exclude_cols=("start", "end", "text", "predicted_label")):
+        exclude = {"start", "end", "text", "predicted_label"}
+
+        emotion_cols = []
+        for col in df.columns:
+            if col in exclude:
+                continue
+            try:
+                df[col].astype(float)
+                emotion_cols.append(col)
+            except ValueError:
+                pass
+
+        return emotion_cols

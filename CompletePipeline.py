@@ -1,7 +1,12 @@
+from Pipeline.Testo.test_omgdataset import pred_emo_from_omgdataset
+from Preprocessing.Testo.omgdataset_preprocess import preprocess_omgdataset_dataset_single_audio
+from Utilities.transcription_manager import TranscriptionManager
+from collections import defaultdict
 from Utilities.utils import *
 import cv2
 from Preprocessing.Video.preprocessing_video import *
 import shutil
+import math
 import json
 from Pipeline.Video.EmotionExtractor import *
 import os
@@ -22,12 +27,112 @@ def to_python_float(obj):
         except:
             return obj
 
+def segments_to_time_slots_with_scores(
+    emotion_preds: pd.DataFrame,
+    emotion_columns: list
+):
+    """
+    Converte segmenti temporali in time-slot (1 sec)
+    restituendo, per ogni time-slot, la distribuzione
+    media delle emozioni.
+
+    Esempio di output:
+    {
+        "ts": 5,
+        "emotions": {
+            "neutral": 0.19,
+            "joy": 0.30,
+            "anger": 0.01,
+            "sadness": 0.38,
+            ...
+        }
+    }
+    """
+
+    # ts -> lista di vettori di probabilità
+    ts_emotion_vectors = defaultdict(list)
+
+    for _, row in emotion_preds.iterrows():
+        start = row["start"]
+        end = row["end"]
+
+        ts_start = math.floor(start) + 1
+        ts_end = math.floor(end) + 1
+
+        emotion_vector = row[emotion_columns].values.astype(float)
+
+        for ts in range(ts_start, ts_end + 1):
+            ts_emotion_vectors[ts].append(emotion_vector)
+
+    # Aggregazione per time-slot
+    time_slot_data = []
+
+    for ts in sorted(ts_emotion_vectors.keys()):
+        vectors = np.stack(ts_emotion_vectors[ts], axis=0)
+        mean_scores = vectors.mean(axis=0)
+
+        emotions_dict = {
+            emotion_columns[i]: float(mean_scores[i])
+            for i in range(len(emotion_columns))
+        }
+
+        time_slot_data.append({
+            "ts": ts,
+            "emotions": emotions_dict
+        })
+
+    return time_slot_data
+
+def pad_time_slots_to_video_length(
+    time_slot_data: list,
+    total_ts_video: int
+):
+    """
+    Estende i time-slot audio per coprire tutta la durata del video:
+    - backward fill (inizio)
+    - forward fill (fine)
+    """
+
+    if not time_slot_data:
+        raise ValueError("time_slot_data è vuoto")
+
+    # ts -> emotions
+    ts_map = {entry["ts"]: entry["emotions"] for entry in time_slot_data}
+
+    first_ts = min(ts_map.keys())
+    last_ts = max(ts_map.keys())
+
+    first_emotions = ts_map[first_ts]
+    last_emotions = ts_map[last_ts]
+
+    padded_time_slots = []
+
+    for ts in range(1, total_ts_video + 1):
+        if ts in ts_map:
+            emotions = ts_map[ts]
+        elif ts < first_ts:
+            # silenzio iniziale → backward fill
+            emotions = first_emotions
+        else:
+            # silenzio finale → forward fill
+            emotions = last_emotions
+
+        padded_time_slots.append({
+            "ts": ts,
+            "emotions": emotions
+        })
+
+    return padded_time_slots
+
 
 if __name__ == "__main__":
 
     # Caricamento config
     config = json.load(open("config.json"))
     utils = Utils(config)
+    transcription_manager = TranscriptionManager(utils)
+
+    logger = utils.setup_logger()
 
     #REPO_ID = "PiantoDiGruppo/Ravdess_AML"
     REPO_ID = "PiantoDiGruppo/OMGEmotion_AML"
@@ -47,7 +152,7 @@ if __name__ == "__main__":
 
         face_emotions = []
 
-        print("---------- ANALISI VIDEO " + video_name + " -------------")
+        logger.info("---------- ANALISI VIDEO " + video_name + " -------------")
 
         if "json" not in video_name:
 
@@ -117,8 +222,11 @@ if __name__ == "__main__":
                     total_sum = sum(average.values())
                     normalized_data = {k: average[k] / total_sum for k in average}
 
-                    print(  "Emozione dominante:",max(normalized_data, key=normalized_data.get) )
-                    print(normalized_data)
+                    # Cambio il nome della felicità da happy a joy per uniformità
+                    normalized_data["joy"] = normalized_data.pop("happy")
+
+                    logger.info("Emozione dominante: " + max(normalized_data, key=normalized_data.get))
+                    logger.info(normalized_data)
 
                     face_emotions.append({ "time_slot": slot["ts"],  "emotions": normalized_data})
 
@@ -126,21 +234,79 @@ if __name__ == "__main__":
             cap = cv2.VideoCapture(video_path)
             frame_rate = cap.get(cv2.CAP_PROP_FPS)
             cap.release()
+            
+            if REPO_ID == "PiantoDiGruppo/OMGEmotion_AML":
+                logger.info("---------- ANALISI TESTO " + video_name + " -------------")
 
+                # -------------------- PREPROCESSING TESTO --------------------
 
-            time_slots = []
+                audio_file_path = os.path.join(audio_path, utils.config["General"]["temp_audio_name"])
 
-            for fe in face_emotions:
-                time_slots.append({
-                    "ts": fe["time_slot"],
-                    "modal": {
-                        "video": {
-                            "emotions": to_python_float(fe["emotions"])
-                        },
-                        "audio": {},  # da integrare
-                        "text": {}    # da integrare
-                    }
-                })
+                logger.info("=== CARICO MODELLO WHISPER LARGE V3 (PREPROCESSING) ===")
+                transcriptor, processor, device, torch_dtype = transcription_manager.load_whisper(
+                    model_id=utils.config["Preprocessing"]["Text"]["Model"]["model_id"]
+                ) 
+
+                df_segments = preprocess_omgdataset_dataset_single_audio(
+                    transcription_manager=transcription_manager,
+                    utils=utils,
+                    device=device,
+                    processor=processor,
+                    torch_dtype=torch_dtype,
+                    transcriptor=transcriptor,
+                    audio_name=audio_file_path
+                )
+
+                emotion_preds = pred_emo_from_omgdataset(df_segments=df_segments,model_name="Emoberta", dataset_name_train="Goemotions", utils=utils, audio_name=audio_file_path)
+
+                logger.info(emotion_preds.head())
+
+                emotion_columns = utils.infer_emotion_columns(emotion_preds)
+            
+                # Converto i segmenti in time_slots con score medi
+                time_slots_text = segments_to_time_slots_with_scores(
+                    emotion_preds=emotion_preds,
+                    emotion_columns=emotion_columns
+                )
+
+                # Riempimento time slots per coprire tutta la durata del video
+                time_slots_text = pad_time_slots_to_video_length(
+                    time_slots_text,
+                    len(dati["time_slot"])
+                )
+
+                logger.info("Time slots testo con scores medi:" + str(time_slots_text))
+
+                time_slots = []
+
+                for fe in face_emotions:
+                    text_emotions = next((ts for ts in time_slots_text if ts["ts"] == fe["time_slot"]), None)
+                    time_slots.append({
+                        "ts": fe["time_slot"],
+                        "modal": {
+                            "video": {
+                                "emotions": to_python_float(fe["emotions"])
+                            },
+                            "audio": {},  # da integrare
+                            "text": {
+                                "emotions": to_python_float(text_emotions["emotions"]) if text_emotions is not None else {}
+                            }    # da integrare
+                        }
+                    })
+            else:
+                time_slots = []
+
+                for fe in face_emotions:
+                    time_slots.append({
+                        "ts": fe["time_slot"],
+                        "modal": {
+                            "video": {
+                                "emotions": to_python_float(fe["emotions"])
+                            },
+                            "audio": {},  # da integrare
+                            "text": {}    # da integrare
+                        }
+                    })
 
             # Aggiorno il file di info.json con gli score raccolti
             with open(complete_info_path, "r", encoding="utf-8") as f:
