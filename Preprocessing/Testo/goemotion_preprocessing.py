@@ -5,7 +5,10 @@ import pandas as pd
 def load_goemotion_dataset(split_name: str, utils: Utils, n_samples: int=None, exclude_neutral: bool=False) -> pd.DataFrame:
     logger = utils.setup_logger()
 
-    dataset = load_dataset("go_emotions", "simplified", split=split_name)
+    dataset_path = utils.config["Dataset"]["Goemotions"]["dataset_path"]
+    dataset_name = utils.config["Dataset"]["Goemotions"]["dataset_name"]
+
+    dataset = load_dataset(dataset_path, dataset_name, split=split_name)
 
     logger.info(f"Nel dataset GOMOTIONS {split_name} sono presenti {len(dataset)} campioni.")
 

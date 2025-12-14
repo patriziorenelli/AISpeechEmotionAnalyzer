@@ -20,20 +20,14 @@ def test(model_name: str, dataset_name_train: str, dataset_name_test: str, utils
     # Preprocessing 
     logger.info(f"Preprocessing del dataset di test: {dataset_name_test}")
 
-    if dataset_name_test == "GOEMOTIONS":
+    if dataset_name_test == "Goemotions":
         df_test = preprocess_goemotion_dataset(split_name='test', n_samples=n_sample_test, exclude_neutral=exclude_neutral, utils=utils)
 
         # Mappa le etichette a quelle di Ekman
         df_test = utils.map_labels_to_ekman_mapping(df_test)
 
-    elif dataset_name_test == "MELD":
+    elif dataset_name_test == "Meld":
         df_test = preprocess_meld_dataset(split_name='test', n_samples=n_sample_test, exclude_neutral=exclude_neutral, utils=utils)
-    
-    elif dataset_name_test == "RAVDESS":
-        df_test = preprocess_ravdess_dataset(split_name='test', n_samples=n_sample_test, exclude_neutral=exclude_neutral, utils=utils)
-
-        # Mappa le etichette a quelle di Ekman
-        df_test = utils.map_labels_to_ekman_mapping(df_test)
     else:
         raise ValueError(f"Unknown dataset: {dataset_name_test}")
 
@@ -48,14 +42,14 @@ def test(model_name: str, dataset_name_train: str, dataset_name_test: str, utils
     #  Tokenizzazione
     logger.info(f"Tokenizzazione del dataset di test: {dataset_name_test}")
 
-    tokenizer_saved = f"{utils.config['Paths']['tokenizers_dir']}/{model_name}_{dataset_name_train}_{n_sample_train}"
+    tokenizer_saved = f"{utils.config['Paths']['tokenizers_dir']}/{model_name.upper()}_{dataset_name_train.upper()}_{n_sample_train}"
 
     if os.path.exists(tokenizer_saved):
         tokenizer = AutoTokenizer.from_pretrained(tokenizer_saved)
     else:
-        tokenizer = AutoTokenizer.from_pretrained(model_name)
+        tokenizer = AutoTokenizer.from_pretrained(utils.config["Pipelines"]["Text"]["Models"][model_name]["tokenizer_name"])
 
-    tokenized_test = dataset_test.map(lambda x: utils.tokenize(tokenizer, x, utils.config["Pipelines"]["Text"]["Model"]["tokenizer_max_length"]), batched=True, remove_columns=["text"])
+    tokenized_test = dataset_test.map(lambda x: utils.tokenize(tokenizer, x, utils.config["Pipelines"]["Text"]["Models"][model_name]["tokenizer_max_length"]), batched=True, remove_columns=["text"])
 
     logger.info(f"Tokenizzazione del dataset di test completata.")
 
@@ -63,7 +57,7 @@ def test(model_name: str, dataset_name_train: str, dataset_name_test: str, utils
     logger.info(f"Caricamento del modello {model_name} allenato su {dataset_name_train}")
     
     num_labels = len(le.classes_)
-    model_saved = f"{utils.config['Paths']['models_dir']}/{model_name}_{dataset_name_train}_{n_sample_train}"
+    model_saved = f"{utils.config['Paths']['models_dir']}/{model_name.upper()}_{dataset_name_train.upper()}_{n_sample_train}"
 
     is_saved = os.path.exists(model_saved)
     model_path = os.path.abspath(model_saved) if is_saved else None

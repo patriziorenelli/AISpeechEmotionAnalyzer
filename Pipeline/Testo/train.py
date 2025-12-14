@@ -23,14 +23,14 @@ def train(model_name: str, dataset_name: str, utils: Utils):
     # Preprocessing 
     logger.info(f"Preprocessing del dataset di addestramento: {dataset_name}")
 
-    if dataset_name == "GOEMOTIONS":
+    if dataset_name == "Goemotions":
         df_train = preprocess_goemotion_dataset(split_name='train', n_samples=n_sample_train, exclude_neutral=exclude_neutral, utils=utils)
         df_eval = preprocess_goemotion_dataset(split_name='validation', n_samples=n_sample_val, exclude_neutral=exclude_neutral, utils=utils)
 
         # Mappa le etichette a quelle di Ekman
         df_train = utils.map_labels_to_ekman_mapping(df_train)
         df_eval = utils.map_labels_to_ekman_mapping(df_eval)
-    elif dataset_name == "MELD":
+    elif dataset_name == "Meld":
         df_train = preprocess_meld_dataset(split_name='train', n_samples=n_sample_train, exclude_neutral=exclude_neutral, utils=utils)
         df_eval = preprocess_meld_dataset(split_name='dev', n_samples=n_sample_val, exclude_neutral=exclude_neutral, utils=utils)
     else:
@@ -52,9 +52,9 @@ def train(model_name: str, dataset_name: str, utils: Utils):
 
     use_fast = True if model_name != "XLNET" else False  # XLNet non supporta il tokenizer veloce
 
-    tokenizer = AutoTokenizer.from_pretrained(utils.config["Pipelines"]["Text"]["Model"]["tokenizer_name"], use_fast=use_fast)
-    tokenized_train = dataset_train.map(lambda x: utils.tokenize(tokenizer, x, utils.config["Pipelines"]["Text"]["Model"]["tokenizer_max_length"]), batched=True, remove_columns=["text"])
-    tokenized_eval = dataset_eval.map(lambda x: utils.tokenize(tokenizer, x, utils.config["Pipelines"]["Text"]["Model"]["tokenizer_max_length"]), batched=True, remove_columns=["text"])
+    tokenizer = AutoTokenizer.from_pretrained(utils.config["Pipelines"]["Text"]["Models"][model_name]["tokenizer_name"], use_fast=use_fast)
+    tokenized_train = dataset_train.map(lambda x: utils.tokenize(tokenizer, x, utils.config["Pipelines"]["Text"]["Models"][model_name]["tokenizer_max_length"]), batched=True, remove_columns=["text"])
+    tokenized_eval = dataset_eval.map(lambda x: utils.tokenize(tokenizer, x, utils.config["Pipelines"]["Text"]["Models"][model_name]["tokenizer_max_length"]), batched=True, remove_columns=["text"])
 
     logger.info(f"Tokenizzazione del dataset di addestramento completata.")
 

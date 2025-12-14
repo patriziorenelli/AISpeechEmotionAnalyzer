@@ -5,7 +5,7 @@ def load_meld_dataset(split_name:str, utils: Utils, n_samples: int=None, exclude
     logger = utils.setup_logger()
 
     # Usando l'URL possiamo estrarre direttamente solo il testo senza dover scaricare l'intero datase
-    base_url = "https://raw.githubusercontent.com/declare-lab/MELD/master/data/MELD/"
+    base_url = utils.config["Dataset"]["Meld"]["dataset_base_url"]
     dataset = pd.read_csv(base_url + split_name + "_sent_emo.csv")
 
     logger.info(f"Nel dataset MELD {split_name} sono presenti {len(dataset)} campioni.")
