@@ -52,7 +52,7 @@
 
         },
         "Video": {
-
+            "frame_step":5
         }
     },
     "Pipelines": {
@@ -154,7 +154,8 @@
         "models_dir": "./Models",
         "tokenizers_dir": "./Tokenizers",
         "log_dir": "./Logs",
-        "base_path": "CompletePipeline"
+        "base_path": "CompletePipeline",
+        "complete_info_path": "CompletePipeline/complete_info.json"
     },
     "Logger":{
         "level": "info",

@@ -111,7 +111,12 @@ class PreprocessingVideo:
             saved_count = 0
 
             fps = int(video.get(cv2.CAP_PROP_FPS))
-
+            
+            """
+            fps = 30 → frame_step = max(1, 6) = 6 → estraggo 1 frame ogni 6 (5 fps).
+            fps = 25 → frame_step = 5 → estraggo 25/5 = 5 fps.
+            fps = 3 → 3 // 5 = 0 → max(1,0) = 1 → estraggo ogni frame (3 fps).
+            """
             if not frame_step:
                 frame_step = max(1, int(fps // 5))
             #print(frame_step)
