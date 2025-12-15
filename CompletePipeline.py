@@ -169,7 +169,7 @@ if __name__ == "__main__":
             utils.download_single_video_from_hug( REPO_ID, video_name, visual_file_path )
 
             video_path = os.path.join(visual_file_path, vid_name)
-
+            
             # -------------------- PREPROCESSING VIDEO --------------------
             prep = PreprocessingVideo()
             prep.extract_face_frames_HuggingVersion(video=cv2.VideoCapture(video_path),video_name=vid_name, frame_step=config["Preprocessing"]["Video"]["frame_step"], output_folder=os.path.join(visual_file_path, "extractedFaceFrames"))
@@ -224,11 +224,15 @@ if __name__ == "__main__":
 
                     # Cambio il nome della felicità da happy a joy per uniformità
                     normalized_data["joy"] = normalized_data.pop("happy")
+                    normalized_data["anger"] = normalized_data.pop("angry")
 
                     logger.info("Emozione dominante: " + max(normalized_data, key=normalized_data.get))
                     logger.info(normalized_data)
 
                     face_emotions.append({ "time_slot": slot["ts"],  "emotions": normalized_data})
+                else:
+                    face_emotions.append({ "time_slot": slot["ts"],  "emotions": {}})
+
 
             # Nel json salvo il frame rate e il frame_step usato per il downsampling, sono valori che potrebbero esservi utili per capire come allinare i time_slot
             cap = cv2.VideoCapture(video_path)
