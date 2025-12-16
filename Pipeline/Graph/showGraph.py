@@ -12,34 +12,38 @@ data = {
     'neutral': 0.5044311
 }
 
-labels = list(data.keys())
-values = np.array(list(data.values()))
 
-# Chiudo il poligono
-values = np.append(values, values[0])
+def graph_r_theta_plot():
+    labels = list(data.keys())
+    values = np.array(list(data.values()))
 
-# Angoli per ogni punto del poligono
-angles = np.linspace(0, 2*np.pi, len(labels), endpoint=False)
-angles = np.append(angles, angles[0])
+    # Chiudo il poligono
+    values = np.append(values, values[0])
 
-# Creazione figura
-plt.figure(figsize=(8, 8))
-ax = plt.subplot(111, polar=True)
+    # Angoli per ogni punto del poligono
+    angles = np.linspace(0, 2*np.pi, len(labels), endpoint=False)
+    angles = np.append(angles, angles[0])
 
-# Disegna l'area SENZA vincolare i punti agli assi
-ax.plot(angles, values, color="#4AA89E", linewidth=2)
-ax.fill(angles, values, color="#7FD4C1", alpha=0.6)
+    # Creazione figura
+    plt.figure(figsize=(8, 8))
+    ax = plt.subplot(111, polar=True)
 
-# Etichette degli assi
-ax.set_xticks(angles[:-1])
-ax.set_xticklabels(labels, fontsize=12)
+    # Disegna l'area SENZA vincolare i punti agli assi
+    ax.plot(angles, values, color="#4AA89E", linewidth=2)
+    ax.fill(angles, values, color="#7FD4C1", alpha=0.6)
 
-# Limite radiale massimo automaticamente corretto
-ax.set_ylim(0, max(values)*1.1)
+    # Etichette degli assi
+    ax.set_xticks(angles[:-1])
+    ax.set_xticklabels(labels, fontsize=12)
 
-# Griglia
-ax.grid(color="gray", alpha=0.3)
+    # Limite radiale massimo automaticamente corretto
+    ax.set_ylim(0, max(values)*1.1)
 
-plt.title("Emotion Radar Chart")
-plt.tight_layout()
-plt.show()
+    # Griglia
+    ax.grid(color="gray", alpha=0.3)
+
+    plt.title("Emotion Radar Chart")
+    plt.tight_layout()
+    plt.show()
+
+

@@ -27,10 +27,7 @@ def to_python_float(obj):
         except:
             return obj
 
-def segments_to_time_slots_with_scores(
-    emotion_preds: pd.DataFrame,
-    emotion_columns: list
-):
+def segments_to_time_slots_with_scores(emotion_preds: pd.DataFrame, emotion_columns: list):
     """
     Converte segmenti temporali in time-slot (1 sec)
     restituendo, per ogni time-slot, la distribuzione
@@ -179,8 +176,7 @@ if __name__ == "__main__":
 
             # -------------------- ESTRAZIONE EMOZIONI VISO--------------------
             json_file_path = os.path.join(
-                visual_file_path, "extractedFaceFrames", "info.json"
-            )
+                visual_file_path, "extractedFaceFrames", "info.json" )
 
             emotionExtractor = EmotionExtractor()
 
