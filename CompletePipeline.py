@@ -130,6 +130,20 @@ def merge_time_slots(
 
     return time_slots
 
+# NUOVO import
+from Pipeline.Audio.AudioEmotionRecognition import AudioEmotionExtractor
+
+import os
+import glob
+
+# helper: trova il primo wav/flac/mp3 nella cartella audio
+def find_audio_file(audio_folder: str):
+    exts = ["*.wav", "*.flac", "*.mp3", "*.m4a", "*.ogg"]
+    for e in exts:
+        hits = glob.glob(os.path.join(audio_folder, e))
+        if hits:
+            return hits[0]
+    return None
 
 if __name__ == "__main__":
 
@@ -193,7 +207,10 @@ if __name__ == "__main__":
             json_file_path = os.path.join(
                 visual_file_path, "extractedFaceFrames", "info.json" )
 
-            emotionExtractor = EmotionExtractor()
+        # --- Legge time slot dal JSON creato dal preprocessing video ---
+        json_file_path = visual_file_path + "/extractedFaceFrames/info.json"
+        with open(json_file_path, "r", encoding="utf-8") as f:
+            dati = json.load(f)
 
             with open(json_file_path, "r", encoding="utf-8") as file:
                 dati = json.load(file)
@@ -221,7 +238,7 @@ if __name__ == "__main__":
                     for frame in slot["frames"]:
                         frame_val = cv2.imread(frames_path + frame)
 
-                        dominant_emotion, all_detected_emotion = ( emotionExtractor.extractFaceEmotion(frame_val))
+                        dominant_emotion, all_detected_emotion = ( EmotionExtractor.extractFaceEmotion(frame_val))
 
                         for k, v in all_detected_emotion.items():
                             total[k] += v
