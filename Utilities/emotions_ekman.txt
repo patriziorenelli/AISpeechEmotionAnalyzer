@@ -1,7 +1,7 @@
-neutral
-joy
-surprise
 anger
-sadness
 disgust
 fear
+joy
+neutral
+sadness
+surprise

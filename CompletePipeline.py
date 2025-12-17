@@ -1,7 +1,7 @@
 from Pipeline.Testo.test_omgdataset import pred_emo_from_omgdataset
 from Preprocessing.Testo.omgdataset_preprocess import preprocess_omgdataset_dataset_single_audio
 from Utilities.transcription_manager import TranscriptionManager
-from collections import defaultdict
+from collections import Counter, defaultdict
 from Utilities.utils import *
 import cv2
 from Preprocessing.Video.preprocessing_video import *
@@ -27,99 +27,108 @@ def to_python_float(obj):
         except:
             return obj
 
-def segments_to_time_slots_with_scores(emotion_preds: pd.DataFrame, emotion_columns: list):
+def segments_to_time_slots_predictions_only(
+    emotion_preds: pd.DataFrame,
+    emotion_columns: list[str]
+) -> dict[int, dict]:
     """
-    Converte segmenti temporali in time-slot (1 sec)
-    restituendo, per ogni time-slot, la distribuzione
-    media delle emozioni.
-
-    Esempio di output:
-    {
-        "ts": 5,
-        "emotions": {
-            "neutral": 0.19,
-            "joy": 0.30,
-            "anger": 0.01,
-            "sadness": 0.38,
-            ...
-        }
-    }
+    Converte i segmenti di predizione in time-slot (1 sec)
+    restituendo:
+      ts -> distribuzione media delle emozioni
     """
 
-    # ts -> lista di vettori di probabilità
-    ts_emotion_vectors = defaultdict(list)
+    ts_pred_vectors = defaultdict(list)
 
     for _, row in emotion_preds.iterrows():
-        start = row["start"]
-        end = row["end"]
-
-        ts_start = math.floor(start) + 1
-        ts_end = math.floor(end) + 1
+        ts_start = math.floor(row["start"]) + 1
+        ts_end = math.floor(row["end"]) + 1
 
         emotion_vector = row[emotion_columns].values.astype(float)
 
         for ts in range(ts_start, ts_end + 1):
-            ts_emotion_vectors[ts].append(emotion_vector)
+            ts_pred_vectors[ts].append(emotion_vector)
 
-    # Aggregazione per time-slot
-    time_slot_data = []
+    # media per time-slot
+    ts_emotions = {}
 
-    for ts in sorted(ts_emotion_vectors.keys()):
-        vectors = np.stack(ts_emotion_vectors[ts], axis=0)
-        mean_scores = vectors.mean(axis=0)
+    for ts, vectors in ts_pred_vectors.items():
+        stacked = np.stack(vectors, axis=0)
+        mean_scores = stacked.mean(axis=0)
 
-        emotions_dict = {
+        ts_emotions[ts] = {
             emotion_columns[i]: float(mean_scores[i])
             for i in range(len(emotion_columns))
         }
 
-        time_slot_data.append({
-            "ts": ts,
-            "emotions": emotions_dict
-        })
+    return ts_emotions
 
-    return time_slot_data
-
-def pad_time_slots_to_video_length(
-    time_slot_data: list,
+def pad_emotions_to_video_length(
+    ts_emotions: dict[int, dict],
     total_ts_video: int
-):
+) -> dict[int, dict]:
     """
-    Estende i time-slot audio per coprire tutta la durata del video:
-    - backward fill (inizio)
-    - forward fill (fine)
+    Estende le emozioni su tutta la durata del video
+    usando forward + backward fill.
     """
 
-    if not time_slot_data:
-        raise ValueError("time_slot_data è vuoto")
+    padded = {}
+    last = None
 
-    # ts -> emotions
-    ts_map = {entry["ts"]: entry["emotions"] for entry in time_slot_data}
+    # forward fill
+    for ts in range(1, total_ts_video + 1):
+        if ts in ts_emotions:
+            last = ts_emotions[ts]
+        padded[ts] = last
 
-    first_ts = min(ts_map.keys())
-    last_ts = max(ts_map.keys())
+    # backward fill per None iniziali
+    next_val = None
+    for ts in reversed(range(1, total_ts_video + 1)):
+        if padded[ts] is None:
+            padded[ts] = next_val
+        else:
+            next_val = padded[ts]
 
-    first_emotions = ts_map[first_ts]
-    last_emotions = ts_map[last_ts]
+    return padded
 
-    padded_time_slots = []
+def build_gt_per_ts(
+    gt_df: pd.DataFrame,
+    total_ts_video: int,
+    neutral_label: int = 4
+) -> dict[int, int]:
+    """
+    Costruisce la ground truth per ogni time-slot
+    usando SOLO gli intervalli originali.
+    I buchi → neutral.
+    """
+
+    gt_ts = {ts: neutral_label for ts in range(1, total_ts_video + 1)}
+
+    for _, row in gt_df.iterrows():
+        ts_start = math.floor(row["start"]) + 1
+        ts_end = math.floor(row["end"]) + 1
+        label = int(row["EmotionMaxVote"])
+
+        for ts in range(ts_start, ts_end + 1):
+            gt_ts[ts] = label
+
+    return gt_ts
+
+def merge_time_slots(
+    ts_emotions: dict[int, dict],
+    gt_ts: dict[int, int],
+    total_ts_video: int
+) -> list[dict]:
+
+    time_slots = []
 
     for ts in range(1, total_ts_video + 1):
-        if ts in ts_map:
-            emotions = ts_map[ts]
-        elif ts < first_ts:
-            # silenzio iniziale → backward fill
-            emotions = first_emotions
-        else:
-            # silenzio finale → forward fill
-            emotions = last_emotions
-
-        padded_time_slots.append({
+        time_slots.append({
             "ts": ts,
-            "emotions": emotions
+            "ground_truth": gt_ts[ts],
+            "emotions": ts_emotions.get(ts, {})
         })
 
-    return padded_time_slots
+    return time_slots
 
 
 if __name__ == "__main__":
@@ -133,6 +142,12 @@ if __name__ == "__main__":
 
     #REPO_ID = "PiantoDiGruppo/Ravdess_AML"
     REPO_ID = "PiantoDiGruppo/OMGEmotion_AML"
+
+    if REPO_ID == "PiantoDiGruppo/Ravdess_AML":
+        # inserire qui il codice per ravdess
+        pass
+    else:
+        df_metadata = pd.read_csv(utils.config["Paths"]["omgdataset_metadata_file"])
 
     name_list = utils.get_file_list_names(REPO_ID)
 
@@ -236,6 +251,7 @@ if __name__ == "__main__":
             cap.release()
             
             if REPO_ID == "PiantoDiGruppo/OMGEmotion_AML":
+                
                 logger.info("---------- ANALISI TESTO " + video_name + " -------------")
 
                 # -------------------- PREPROCESSING TESTO --------------------
@@ -262,16 +278,29 @@ if __name__ == "__main__":
                 logger.info(emotion_preds.head())
 
                 emotion_columns = utils.infer_emotion_columns(emotion_preds)
-            
-                # Converto i segmenti in time_slots con score medi
-                time_slots_text = segments_to_time_slots_with_scores(
-                    emotion_preds=emotion_preds,
-                    emotion_columns=emotion_columns
+                
+                # Mantengo solo le colonne video_id, start, end, label
+                ground_truth_labels = df_metadata[["video_id", "start", "end", "EmotionMaxVote"]][df_metadata["video_id"] == vid_name.replace(".mp4","")]
+                
+                ts_emotions = segments_to_time_slots_predictions_only(
+                    emotion_preds,
+                    emotion_columns
                 )
 
-                # Riempimento time slots per coprire tutta la durata del video
-                time_slots_text = pad_time_slots_to_video_length(
-                    time_slots_text,
+                ts_emotions = pad_emotions_to_video_length(
+                    ts_emotions,
+                    len(dati["time_slot"])
+                )
+
+                gt_ts = build_gt_per_ts(
+                    ground_truth_labels,
+                    len(dati["time_slot"]),
+                    neutral_label=4
+                )
+
+                time_slots_text = merge_time_slots(
+                    ts_emotions,
+                    gt_ts,
                     len(dati["time_slot"])
                 )
 
@@ -283,6 +312,7 @@ if __name__ == "__main__":
                     text_emotions = next((ts for ts in time_slots_text if ts["ts"] == fe["time_slot"]), None)
                     time_slots.append({
                         "ts": fe["time_slot"],
+                        "ground_truth": text_emotions["ground_truth"] if text_emotions is not None else None,
                         "modal": {
                             "video": {
                                 "emotions": to_python_float(fe["emotions"])
@@ -323,7 +353,8 @@ if __name__ == "__main__":
                 json.dump(complete_info, f, indent=4, ensure_ascii=False)
 
             # cancella tutti i file scaricati e processati, lasciando la cartella principale con dentro solo il file json con le info
-            shutil.rmtree(general_path)
+            #shutil.rmtree(general_path)
+            break
 
             # per fermare l'esecuzione quando facciamo test
             #if vid_name == "1v6f9b2KMRA.mp4":

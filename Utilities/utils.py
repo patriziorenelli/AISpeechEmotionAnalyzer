@@ -289,13 +289,11 @@ class Utils:
         with open(self.config["Paths"]["ekman_emotion_labels_file"], "r", encoding="utf-8") as f:
             ekman_emotion_labels = [line.strip() for line in f if line.strip()]
         return ekman_emotion_labels
-    
-    def infer_emotion_columns(self, df, exclude_cols=("start", "end", "text", "predicted_label")):
-        exclude = {"start", "end", "text", "predicted_label"}
 
+    def infer_emotion_columns(self, df, exclude_cols={"start", "end", "text", "predicted_label"}) -> list[str]:
         emotion_cols = []
         for col in df.columns:
-            if col in exclude:
+            if col in exclude_cols:
                 continue
             try:
                 df[col].astype(float)
@@ -304,3 +302,15 @@ class Utils:
                 pass
 
         return emotion_cols
+    
+    def extract_omg_dataset_ground_truth_labels(self) -> pd.DataFrame:
+        df_metadata = pd.read_csv(self.config["Paths"]["omgdataset_metadata_file"])
+        data = df_metadata.to_dict(orient="records")
+
+        ground_truth = {}
+        for item in data:
+            video_name = item["video_id"]
+            label = item["EmotionMaxVote"]
+            ground_truth[video_name] = label
+
+        return ground_truth
