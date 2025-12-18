@@ -314,3 +314,28 @@ class Utils:
             ground_truth[video_name] = label
 
         return ground_truth
+    
+    def encode_ekman_labels(self, label_name: str) -> int:
+        """
+        Codifica una label Ekman in un intero a partire da 0.
+
+        Esempio:
+        anger    -> 0
+        disgust  -> 1
+        fear     -> 2
+        joy      -> 3
+        neutral  -> 4
+        sadness  -> 5
+        surprise -> 6
+        """
+
+        labels_list = self.get_emotion_ekman_labels()
+
+        if label_name not in labels_list:
+            raise ValueError(
+                f"Label '{label_name}' non valida. "
+                f"Valori ammessi: {labels_list}"
+            )
+
+        return labels_list.index(label_name)
+      

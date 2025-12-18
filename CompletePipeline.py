@@ -1,5 +1,6 @@
 from Pipeline.Testo.test_omgdataset import pred_emo_from_omgdataset
 from Preprocessing.Testo.omgdataset_preprocess import preprocess_omgdataset_dataset_single_audio
+from Utilities.evaluation_manager import EvaluationManager
 from Utilities.transcription_manager import TranscriptionManager
 from collections import Counter, defaultdict
 from Utilities.utils import *
@@ -11,8 +12,6 @@ import json
 from Pipeline.Video.EmotionExtractor import *
 import os
 from Pipeline.Audio.AudioEmotionRecognition import AudioEmotionExtractor
-
-
 
 def to_python_float(obj):
     """
@@ -92,7 +91,7 @@ def pad_emotions_to_video_length(
 
     return padded
 
-def build_gt_per_ts(
+def build_gt_with_intervals(
     gt_df: pd.DataFrame,
     total_ts_video: int,
     neutral_label: int = 4
@@ -112,6 +111,18 @@ def build_gt_per_ts(
 
         for ts in range(ts_start, ts_end + 1):
             gt_ts[ts] = label
+
+    return gt_ts
+
+def build_gt_without_intervals(
+    total_ts_video: int,
+    video_label: int
+) -> dict[int, int]:
+    """
+    Costruisce la ground truth per ogni time-slot
+    non usando gli intervalli originali.
+    """
+    gt_ts = {ts: video_label for ts in range(1, total_ts_video + 1)}
 
     return gt_ts
 
@@ -139,19 +150,20 @@ if __name__ == "__main__":
     config = json.load(open("config.json"))
     utils = Utils(config)
     transcription_manager = TranscriptionManager(utils)
+    evaluation_manager = EvaluationManager(utils)
 
     logger = utils.setup_logger()
 
-    #REPO_ID = "PiantoDiGruppo/Ravdess_AML"
-    REPO_ID = "PiantoDiGruppo/OMGEmotion_AML"
+    REPO_ID = "PiantoDiGruppo/Ravdess_AML"
+    #REPO_ID = "PiantoDiGruppo/OMGEmotion_AML"
 
     if REPO_ID == "PiantoDiGruppo/Ravdess_AML":
-        # inserire qui il codice per ravdess
-        pass
+        df_metadata = pd.read_csv(utils.config["Paths"]["ravdess_metadata_file"])
     else:
         df_metadata = pd.read_csv(utils.config["Paths"]["omgdataset_metadata_file"])
 
-    name_list = utils.get_file_list_names(REPO_ID)
+    # Provo solo 10 video
+    name_list = utils.get_file_list_names(REPO_ID)[0:10]
 
     # Crea cartella base
     os.makedirs(config["Paths"]["base_path"], exist_ok=True)
@@ -216,7 +228,6 @@ if __name__ == "__main__":
             # indicizza per lookup rapido
             audio_emotions_by_ts = {x["time_slot"]: x["emotions"] for x in audio_emotions}
 
-
             for slot in dati["time_slot"]:
 
                 if slot["valid"]:
@@ -253,6 +264,7 @@ if __name__ == "__main__":
                     # Cambio il nome della felicità da happy a joy per uniformità
                     normalized_data["joy"] = normalized_data.pop("happy")
                     normalized_data["anger"] = normalized_data.pop("angry")
+                    normalized_data["sadness"] = normalized_data.pop("sad")
 
                     logger.info("Emozione dominante: " + max(normalized_data, key=normalized_data.get))
                     logger.info(normalized_data)
@@ -312,7 +324,7 @@ if __name__ == "__main__":
                 )
 
                 #non mi interessa
-                gt_ts = build_gt_per_ts(
+                gt_ts = build_gt_with_intervals(
                     ground_truth_labels,
                     len(dati["time_slot"]),
                     neutral_label=4
@@ -352,9 +364,13 @@ if __name__ == "__main__":
             else:
                 time_slots = []
 
+                ground_truth_label = int(df_metadata[df_metadata["video"] == vid_name]["EmotionMaxVote"].values[0])
+                gt_ts = build_gt_without_intervals(total_ts_video=len(dati["time_slot"]), video_label= ground_truth_label)
+
                 for fe in face_emotions:
                     time_slots.append({
                         "ts": fe["time_slot"],
+                        "ground_truth": gt_ts[fe["time_slot"]],
                         "modal": {
                             "video": {
                                 "emotions": to_python_float(fe["emotions"])
@@ -381,9 +397,18 @@ if __name__ == "__main__":
                 json.dump(complete_info, f, indent=4, ensure_ascii=False)
 
             # cancella tutti i file scaricati e processati, lasciando la cartella principale con dentro solo il file json con le info
-            #shutil.rmtree(general_path)
-            break
+            shutil.rmtree(general_path)
+            #break
 
             # per fermare l'esecuzione quando facciamo test
             #if vid_name == "1v6f9b2KMRA.mp4":
             #   break
+
+    # Calcolo le metriche per ogni stream
+    stream_names = ["audio", "video", "text"]
+
+    for stream in stream_names:
+        evaluation_manager.evaluate_stream(stream_name=stream, video_name_list=name_list)
+
+    evaluation_manager.evaluate_fusion(stream_names=stream_names, video_name_list=name_list)
+

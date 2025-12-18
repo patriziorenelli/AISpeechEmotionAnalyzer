@@ -156,6 +156,7 @@
         "tokenizers_dir": "./Tokenizers",
         "log_dir": "./Logs",
         "omgdataset_metadata_file": "./Utilities/Metadata/omg_dataset_metadata.csv",
+        "ravdess_metadata_file": "./Utilities/Metadata/ravdess_dataset_metadata.csv",
         "base_path": "CompletePipeline",
         "complete_info_path": "CompletePipeline/complete_info.json",
         "ekman_emotion_labels_file": "./Utilities/emotions_ekman.txt",
