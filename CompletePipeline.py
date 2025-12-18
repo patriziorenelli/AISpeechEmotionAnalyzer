@@ -10,6 +10,8 @@ import math
 import json
 from Pipeline.Video.EmotionExtractor import *
 import os
+from Pipeline.Audio.AudioEmotionRecognition import AudioEmotionExtractor
+
 
 
 def to_python_float(obj):
@@ -200,6 +202,21 @@ if __name__ == "__main__":
 
             frames_path = os.path.join( visual_file_path, "extractedFaceFrames") + "/"
 
+            # -------------------- ESTRAZIONE EMOZIONI AUDIO --------------------
+            audio_file_path = os.path.join(audio_path, utils.config["General"]["temp_audio_name"])
+
+            #la mia bellissima classe
+            audioExtractor = AudioEmotionExtractor()
+            #dovrebbe andare bene
+            audio_emotions = audioExtractor.predict_per_time_slot(
+                audio_path=audio_file_path,
+                total_ts=len(dati["time_slot"]),
+                slot_seconds=1.0
+            )
+            # indicizza per lookup rapido
+            audio_emotions_by_ts = {x["time_slot"]: x["emotions"] for x in audio_emotions}
+
+
             for slot in dati["time_slot"]:
 
                 if slot["valid"]:
@@ -256,8 +273,10 @@ if __name__ == "__main__":
 
                 # -------------------- PREPROCESSING TESTO --------------------
 
+                #prendiamo audio di patricio (usa direttamente questo)
                 audio_file_path = os.path.join(audio_path, utils.config["General"]["temp_audio_name"])
 
+                #carica whisper e fa preprocessing
                 logger.info("=== CARICO MODELLO WHISPER LARGE V3 (PREPROCESSING) ===")
                 transcriptor, processor, device, torch_dtype = transcription_manager.load_whisper(
                     model_id=utils.config["Preprocessing"]["Text"]["Model"]["model_id"]
@@ -292,12 +311,14 @@ if __name__ == "__main__":
                     len(dati["time_slot"])
                 )
 
+                #non mi interessa
                 gt_ts = build_gt_per_ts(
                     ground_truth_labels,
                     len(dati["time_slot"]),
                     neutral_label=4
                 )
 
+                #manco questa
                 time_slots_text = merge_time_slots(
                     ts_emotions,
                     gt_ts,
@@ -308,6 +329,7 @@ if __name__ == "__main__":
 
                 time_slots = []
 
+                #alla fine i 3 metodi di rpedizione vengono integrati (vedi che manca audio)
                 for fe in face_emotions:
                     text_emotions = next((ts for ts in time_slots_text if ts["ts"] == fe["time_slot"]), None)
                     time_slots.append({
@@ -317,12 +339,16 @@ if __name__ == "__main__":
                             "video": {
                                 "emotions": to_python_float(fe["emotions"])
                             },
-                            "audio": {},  # da integrare
+                            "audio": {
+                                "emotions": to_python_float(audio_emotions_by_ts.get(fe["time_slot"], {}))
+                            },
                             "text": {
                                 "emotions": to_python_float(text_emotions["emotions"]) if text_emotions is not None else {}
                             }    # da integrare
                         }
                     })
+            
+            #caso altro dataset
             else:
                 time_slots = []
 
@@ -333,7 +359,9 @@ if __name__ == "__main__":
                             "video": {
                                 "emotions": to_python_float(fe["emotions"])
                             },
-                            "audio": {},  # da integrare
+                            "audio": {
+                                "emotions": to_python_float(audio_emotions_by_ts.get(fe["time_slot"], {}))
+                            },
                             "text": {}    # da integrare
                         }
                     })
