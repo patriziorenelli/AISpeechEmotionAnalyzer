@@ -2,7 +2,7 @@ from Pipeline.Testo.test_omgdataset import pred_emo_from_omgdataset
 from Preprocessing.Testo.omgdataset_preprocess import preprocess_omgdataset_dataset_single_audio
 from Utilities.evaluation_manager import EvaluationManager
 from Utilities.transcription_manager import TranscriptionManager
-from collections import Counter, defaultdict
+from collections import defaultdict
 from Utilities.utils import *
 import cv2
 from Preprocessing.Video.preprocessing_video import *
@@ -154,8 +154,11 @@ if __name__ == "__main__":
 
     logger = utils.setup_logger()
 
-    REPO_ID = "PiantoDiGruppo/Ravdess_AML"
-    #REPO_ID = "PiantoDiGruppo/OMGEmotion_AML"
+    #REPO_ID = "PiantoDiGruppo/Ravdess_AML"
+    REPO_ID = "PiantoDiGruppo/OMGEmotion_AML"
+
+    text_model = "Emoberta"
+    dataset_train_text = "Goemotions"
 
     if REPO_ID == "PiantoDiGruppo/Ravdess_AML":
         df_metadata = pd.read_csv(utils.config["Paths"]["ravdess_metadata_file"])
@@ -163,7 +166,7 @@ if __name__ == "__main__":
         df_metadata = pd.read_csv(utils.config["Paths"]["omgdataset_metadata_file"])
 
     # Provo solo 10 video
-    name_list = utils.get_file_list_names(REPO_ID)[0:10]
+    name_list = utils.get_file_list_names(REPO_ID)[0:1]
 
     # Crea cartella base
     os.makedirs(config["Paths"]["base_path"], exist_ok=True)
@@ -304,9 +307,9 @@ if __name__ == "__main__":
                     audio_name=audio_file_path
                 )
 
-                emotion_preds = pred_emo_from_omgdataset(df_segments=df_segments,model_name="Emoberta", dataset_name_train="Goemotions", utils=utils, audio_name=audio_file_path)
+                emotion_preds = pred_emo_from_omgdataset(df_segments=df_segments,model_name= text_model, dataset_name_train=dataset_train_text, utils=utils, audio_name=audio_file_path)
 
-                logger.info(emotion_preds.head())
+                logger.debug(emotion_preds.head())
 
                 emotion_columns = utils.infer_emotion_columns(emotion_preds)
                 

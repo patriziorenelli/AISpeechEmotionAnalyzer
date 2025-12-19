@@ -61,7 +61,7 @@
            
         },
         "Text": {
-            "n_sample_train": 1000,
+            "n_sample_train": 20000,
             "n_sample_val": 200,
             "n_sample_test": 200,
             "exclude_neutral": true,
