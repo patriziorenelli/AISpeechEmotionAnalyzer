@@ -147,7 +147,8 @@
         "accuracy":  "accuracy",
         "f1": "f1",
         "precision": "precision",
-        "recall": "recall"
+        "recall": "recall",
+        "EmotionOrder": ["neutral","happy","sad","angry","fear","disgust","surprise"]
     },
     "Paths": {
         "emotion_file": "./Utilities/emotions.txt",
