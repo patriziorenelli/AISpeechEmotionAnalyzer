@@ -1096,7 +1096,7 @@ def temporal_graph_with_video(video_path, data_list, color_map):
     plt.show()
 
 
-temporal_graph_with_video("D:/Users/Patrizio/Desktop/AISpeeh/AISpeechEmotionAnalyzer/CampioniVideo/faces_video_graph.mp4", data_list, color_map )
+temporal_graph_with_video("C:/Users/aless/OneDrive/Desktop/AiSpeech/CampioniVideo/faces_video_graph.mp4", data_list, color_map )
 
 
 #temporal_graph()

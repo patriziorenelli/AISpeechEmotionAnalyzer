@@ -153,9 +153,9 @@ if __name__ == "__main__":
     evaluation_manager = EvaluationManager(utils)
 
     logger = utils.setup_logger()
-
-    #REPO_ID = "PiantoDiGruppo/Ravdess_AML"
-    REPO_ID = "PiantoDiGruppo/OMGEmotion_AML"
+    
+    REPO_ID = "PiantoDiGruppo/Ravdess_AML"
+    #REPO_ID = "PiantoDiGruppo/OMGEmotion_AML"
 
     text_model = "Emoberta"
     dataset_train_text = "Goemotions"
@@ -165,8 +165,7 @@ if __name__ == "__main__":
     else:
         df_metadata = pd.read_csv(utils.config["Paths"]["omgdataset_metadata_file"])
 
-    # Provo solo 10 video
-    name_list = utils.get_file_list_names(REPO_ID)[0:1]
+    name_list = utils.get_file_list_names(REPO_ID)[0:utils.config["General"]["numVideo"]]
 
     # Crea cartella base
     os.makedirs(config["Paths"]["base_path"], exist_ok=True)
@@ -176,7 +175,7 @@ if __name__ == "__main__":
         with open(complete_info_path, "w", encoding="utf-8") as f:
             json.dump({}, f)
 
-
+    logger.info("=== INIZIO PIPELINE COMPLETA ===")
     for video_name in name_list:
 
         face_emotions = []
@@ -218,16 +217,37 @@ if __name__ == "__main__":
             frames_path = os.path.join( visual_file_path, "extractedFaceFrames") + "/"
 
             # -------------------- ESTRAZIONE EMOZIONI AUDIO --------------------
+            logger.info("---------- ANALISI AUDIO " + video_name + " -------------")
             audio_file_path = os.path.join(audio_path, utils.config["General"]["temp_audio_name"])
 
             #la mia bellissima classe
-            audioExtractor = AudioEmotionExtractor()
+            #ora imp-lementa VAD per ignorare il non parlato
+            audioExtractor = AudioEmotionExtractor(
+                vad_enabled=False,
+                vad_rms_threshold=0.015,          # da tarare
+                vad_fallback_to_neutral=False,     # oppure False per {}, FALSE NON FUNZIONA
+                confidence_threshold=0.05         # opzionale: es. 0.45
+            )
+
             #dovrebbe andare bene
+            
             audio_emotions = audioExtractor.predict_per_time_slot(
                 audio_path=audio_file_path,
                 total_ts=len(dati["time_slot"]),
-                slot_seconds=1.0
+                slot_seconds=0.5,
+                context_seconds=0.0,   # opzionale, meglio 6.0
+                centered=True          # opzionale
             )
+
+
+            '''
+            audio_emotions = audioExtractor.predict_per_time_slot_spread(
+                audio_path=audio_file_path,
+                total_ts=len(dati["time_slot"]),
+                slot_seconds=1.0,
+                context_seconds=6.0,  # audio più lungo
+                spread_k=3            # spalma su 3 slot (ts-1, ts, ts+1)
+            )'''
             # indicizza per lookup rapido
             audio_emotions_by_ts = {x["time_slot"]: x["emotions"] for x in audio_emotions}
 
@@ -270,7 +290,7 @@ if __name__ == "__main__":
                     normalized_data["sadness"] = normalized_data.pop("sad")
 
                     logger.info("Emozione dominante: " + max(normalized_data, key=normalized_data.get))
-                    logger.info(normalized_data)
+                    logger.debug(normalized_data)
 
                     face_emotions.append({ "time_slot": slot["ts"],  "emotions": normalized_data})
                 else:
@@ -292,7 +312,6 @@ if __name__ == "__main__":
                 audio_file_path = os.path.join(audio_path, utils.config["General"]["temp_audio_name"])
 
                 #carica whisper e fa preprocessing
-                logger.info("=== CARICO MODELLO WHISPER LARGE V3 (PREPROCESSING) ===")
                 transcriptor, processor, device, torch_dtype = transcription_manager.load_whisper(
                     model_id=utils.config["Preprocessing"]["Text"]["Model"]["model_id"]
                 ) 

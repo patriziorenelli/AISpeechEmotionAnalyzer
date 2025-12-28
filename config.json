@@ -3,7 +3,8 @@
         "AppName": "AI Speech Emotion Analyzer",
         "Version": "1.0.0",
         "DebugMode": true,
-        "temp_audio_name": "originalAudio.wav"
+        "temp_audio_name": "originalAudio.wav",
+        "numVideo": 20
     },
     "Dataset": {
         "Ravdess": {
@@ -53,7 +54,7 @@
             }
         },
         "Video": {
-            "frame_step":5
+            "frame_step":3
         }
     },
     "Pipelines": {
