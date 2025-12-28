@@ -925,7 +925,6 @@ data_list = [ {
 }]
 
 
-# Questo grafico non mi pare sia la soluzione migliore per mostrare le nostre predizioni in quanto alcune emozioni avranno valori molto piccoli e il grafico non verrebbe bene
 def graph_r_theta_plot():
     labels = list(data.keys())
     values = np.array(list(data.values()))

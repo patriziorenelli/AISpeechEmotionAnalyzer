@@ -269,9 +269,6 @@ def extract_face_frames_WITHOUT_downsampling(video, target_size=(224, 224), outp
     out_video.release()
     return frame_step
 
-
-
-# DOVREBBE FUNZIONARE BENE MA MANCA FILE JSON CON nome file, emozione generale, elenco time slot con key:valid/unvalid e per ognuno i frame validi 
 def extract_face_frames_HuggingVersion(video, video_name="video", target_size=(224, 224), frame_step: int = 10, output_folder: str ="Prove/prep-train/face_frames_extracted"):
 
     os.makedirs(output_folder, exist_ok=True)

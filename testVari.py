@@ -44,7 +44,7 @@ if MODEL_CHOICE == "rafdb":
     model = AutoModelForImageClassification.from_pretrained(MODEL_NAME)
     model.to(DEVICE)
     model.eval()
-elif MODEL_CHOICE == "hsemotion": # NON FUNZIONA AL MOMENTO
+elif MODEL_CHOICE == "hsemotion":
     if not HSEMOTION_AVAILABLE:
         raise ImportError("HSEmotion non disponibile. Installa `hsemotion` per usarlo.")
     # Puoi cambiare modello: 'enet_b0_8_best_afew', 'resnet18_afew', ecc.

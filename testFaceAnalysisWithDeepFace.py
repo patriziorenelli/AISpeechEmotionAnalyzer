@@ -2,10 +2,7 @@ import cv2
 from deepface import DeepFace
 from collections import Counter
 
-
-# NOTE: Come accuratezza non è male, confonde emozioni quali paura e disgusto ad esempio e a volte rileva troppo neutral
-
-# ATTENZIONE E' UN TEST SEMPLIFICATO PER CAPIRE LE PERFORMANCE DELLA CLASSIFICAZIONE AUTOMATICA TRRAMITE DeepFace
+# ATTENZIONE E' UN TEST SEMPLIFICATO PER CAPIRE LE PERFORMANCE DELLA CLASSIFICAZIONE AUTOMATICA TRAMITE DeepFace
 # Il campione video example_RAVDESS.mp4 è una clip sample dei video contenuti in RAVDESS con vari attori che dicono le varie frasi esprimento varie emozioni (1 per clip)
 
 # Carica il video
@@ -70,13 +67,13 @@ while True:
         #   -> bisogna lavorare su questa parte per capire tecnica migliore per selezionare l'emozione più semplificativa e cercare di evitare errori
         top_emotion, top_count = emotion_counts.most_common(1)[0]
 
-        print(f"\n⏱️ Time window: {format_time((frame_count-10)/fps)} → {current_time_str}")
+        print(f"\nTime window: {format_time((frame_count-10)/fps)} - {current_time_str}")
         print(f"Emotions detected in frames {frame_count-9} to {frame_count}:")
 
         # Conteggio totale delle emozioni più espresse in ogni frame del time slot
         print(dict(emotion_counts))
 
-        print(f"➡️ Final emotion for this window: **{top_emotion}** (count: {top_count})")
+        print(f"Final emotion for this window: **{top_emotion}** (count: {top_count})")
         print("-" * 60)
 
         emotion_list = []  # reset lista per la prossima finestra

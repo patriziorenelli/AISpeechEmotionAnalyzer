@@ -34,7 +34,7 @@ class AudioEmotionExtractor:
         vad_fallback_to_neutral: bool = True,  # se False -> {}
         neutral_fallback_score: float = 1.0,   # usato solo se fallback_to_neutral=True
         # --- opzionale: gate di confidenza ---
-        confidence_threshold: float | None = None,  # es. 0.45; None per disabilitare
+        confidence_threshold: float | None = None,  
     ):
         self.target_sr = target_sr
         self.min_seconds = float(min_seconds)

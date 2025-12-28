@@ -231,9 +231,6 @@ class EvaluationManager:
             else:
                 mean_js = float(np.average(js_vals, weights=w))
 
-        # normalizzazione opzionale: JS in [0, ln2]. Se vuoi range [0,1] “puro”:
-        # mean_js = mean_js / np.log(2)
-
         return 1.0 - mean_js
 
     def evaluate_fusion(
