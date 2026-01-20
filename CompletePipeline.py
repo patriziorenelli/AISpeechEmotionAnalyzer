@@ -154,8 +154,8 @@ if __name__ == "__main__":
 
     logger = utils.setup_logger()
     
-    REPO_ID = "PiantoDiGruppo/Ravdess_AML"
-    #REPO_ID = "PiantoDiGruppo/OMGEmotion_AML"
+    #REPO_ID = "PiantoDiGruppo/Ravdess_AML"
+    REPO_ID = "PiantoDiGruppo/OMGEmotion_AML"
 
     text_model = "Emoberta"
     dataset_train_text = "Goemotions"
@@ -372,6 +372,9 @@ if __name__ == "__main__":
                 for fe in face_emotions:
                     audio_info = audio_emotions_by_ts.get(fe["time_slot"], {"emotions": {}, "embedding": None})
                     text_emotions = next((ts for ts in time_slots_text if ts["ts"] == fe["time_slot"]), None)
+                    emb = audio_info.get("embedding", None)
+                    if emb is not None:
+                        emb = emb.tolist()   # ndarray -> list (serializzabile JSON)
                     time_slots.append({
                         "ts": fe["time_slot"],
                         "ground_truth": text_emotions["ground_truth"] if text_emotions is not None else None,
@@ -381,7 +384,7 @@ if __name__ == "__main__":
                             },
                             "audio": {
                                 "emotions": to_python_float(audio_info.get("emotions", {})),
-                                "embedding": audio_info.get("embedding", None)
+                                "embedding": emb
                             },
                             "text": {
                                 "emotions": to_python_float(text_emotions["emotions"]) if text_emotions is not None else {}
@@ -398,6 +401,9 @@ if __name__ == "__main__":
 
                 for fe in face_emotions:
                     audio_info = audio_emotions_by_ts.get(fe["time_slot"], {"emotions": {}, "embedding": None})
+                    emb = audio_info.get("embedding", None)
+                    if emb is not None:
+                        emb = emb.tolist()
                     time_slots.append({
                         "ts": fe["time_slot"],
                         "ground_truth": gt_ts[fe["time_slot"]],
@@ -407,7 +413,7 @@ if __name__ == "__main__":
                             },
                             "audio": {
                                 "emotions": to_python_float(audio_info.get("emotions", {})),
-                                "embedding": audio_info.get("embedding", None)
+                                "embedding": emb
                             },
                             "text": {}    # da integrare
                         }
