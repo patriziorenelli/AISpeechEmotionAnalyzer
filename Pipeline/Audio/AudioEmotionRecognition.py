@@ -1,15 +1,231 @@
-# Pipeline/Audio/AudioEmotionExtractor.py
+"""Pipeline/Audio/AudioEmotionRecognition.py
+
+Dual-stream Audio Emotion Representation
+
+Questa versione mantiene la stessa interfaccia pubblica della classe precedente:
+- `predict_per_time_slot(...) -> list[{time_slot, emotions}]`
+
+Estende però l'architettura per estrarre anche un **singolo vettore** (embedding)
+per ogni segmento temporale, ottenuto fondendo:
+
+A) Stream waveform basato su Wav2Vec2 (embedding da features contestuali)
+B) Stream spettro basato su log-Mel + CNN (intensità/ritmo/energia)
+
+Per compatibilità con la pipeline esistente:
+- di default `predict_per_time_slot` continua a ritornare SOLO `emotions`.
+- puoi abilitare il ritorno dell'embedding con `return_embedding=True`.
+
+Nota importante:
+- La parte "emotion" resta (per default) quella del classificatore HF già usato.
+- L'embedding fuso è utile anche senza training.
+- Se vuoi che le emozioni dipendano davvero dalla fusione (e non solo da wav2vec-clf),
+  devi addestrare una head (MLP/gating) e caricare i pesi (checkpoint).
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import librosa
-import torch
-from transformers import pipeline
 
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+try:
+    import torchaudio
+    import torchaudio.transforms as T
+except Exception:  # pragma: no cover
+    torchaudio = None
+    T = None
+
+from transformers import AutoModel, AutoProcessor, pipeline
+
+
+# -----------------------------
+# Utility: pooling
+# -----------------------------
+
+def mean_pool(hidden: torch.Tensor, mask: Optional[torch.Tensor] = None) -> torch.Tensor:
+    """hidden: [B, T, H], mask: [B, T] bool/int (1 for valid)."""
+    if mask is None:
+        return hidden.mean(dim=1)
+    mask = mask.to(hidden.dtype)
+    denom = mask.sum(dim=1, keepdim=True).clamp_min(1.0)
+    return (hidden * mask.unsqueeze(-1)).sum(dim=1) / denom
+
+
+# -----------------------------
+# Stream A: Wav2Vec2 embeddings
+# -----------------------------
+
+class Wav2Vec2EmbeddingStream(nn.Module):
+    """Estrae un embedding da una waveform usando Wav2Vec2 base model."""
+
+    def __init__(
+        self,
+        model_id: str = "facebook/wav2vec2-base",
+        target_sr: int = 16000,
+        device: Optional[torch.device] = None,
+    ):
+        super().__init__()
+        self.target_sr = int(target_sr)
+        self.processor = AutoProcessor.from_pretrained(model_id)
+        self.model = AutoModel.from_pretrained(model_id)
+        self.device = device or (torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu"))
+        self.model.to(self.device)
+        self.model.eval()
+
+    @torch.inference_mode()
+    def forward(self, segment: np.ndarray, sr: int) -> torch.Tensor:
+        """Return: [H] embedding."""
+        if sr != self.target_sr:
+            # librosa.resample è ok qui perché già usi librosa per load
+            segment = librosa.resample(segment.astype(np.float32), orig_sr=sr, target_sr=self.target_sr)
+            sr = self.target_sr
+
+        # HF processor si aspetta float32 in [-1,1]
+        inputs = self.processor(segment, sampling_rate=sr, return_tensors="pt")
+        input_values = inputs.get("input_values").to(self.device)
+        attn_mask = inputs.get("attention_mask")
+        if attn_mask is not None:
+            attn_mask = attn_mask.to(self.device)
+
+        out = self.model(input_values=input_values, attention_mask=attn_mask)
+        hidden = out.last_hidden_state  # [1, T, H]
+        emb = mean_pool(hidden, attn_mask)
+        return emb.squeeze(0)  # [H]
+
+
+# -----------------------------
+# Stream B: log-Mel + CNN
+# -----------------------------
+
+class MelCNN(nn.Module):
+    """Piccola CNN 2D per log-mel. Output: embedding fisso."""
+
+    def __init__(self, in_channels: int = 1, embed_dim: int = 256):
+        super().__init__()
+
+        def block(cin: int, cout: int) -> nn.Sequential:
+            return nn.Sequential(
+                nn.Conv2d(cin, cout, kernel_size=3, padding=1, bias=False),
+                nn.BatchNorm2d(cout),
+                nn.ReLU(inplace=True),
+                nn.MaxPool2d(kernel_size=2),
+            )
+
+        self.features = nn.Sequential(
+            block(in_channels, 32),
+            block(32, 64),
+            block(64, 128),
+            block(128, 256),
+        )
+        self.pool = nn.AdaptiveAvgPool2d((1, 1))
+        self.proj = nn.Linear(256, embed_dim)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # x: [B, 1, n_mels, time]
+        h = self.features(x)
+        h = self.pool(h).flatten(1)  # [B, 256]
+        return self.proj(h)  # [B, embed_dim]
+
+
+class LogMelStream(nn.Module):
+    """Waveform -> log-mel -> CNN embedding."""
+
+    def __init__(
+        self,
+        target_sr: int = 16000,
+        n_mels: int = 80,
+        n_fft: int = 400,
+        hop_length: int = 160,
+        f_min: float = 0.0,
+        f_max: Optional[float] = None,
+        embed_dim: int = 256,
+        device: Optional[torch.device] = None,
+    ):
+        super().__init__()
+        if torchaudio is None:
+            raise ImportError(
+                "torchaudio non è disponibile. Installalo per usare lo stream Mel+CNN."
+            )
+
+        self.target_sr = int(target_sr)
+        self.device = device or (torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu"))
+
+        f_max = float(f_max) if f_max is not None else float(target_sr // 2)
+
+        self.melspec = T.MelSpectrogram(
+            sample_rate=self.target_sr,
+            n_fft=int(n_fft),
+            hop_length=int(hop_length),
+            n_mels=int(n_mels),
+            f_min=float(f_min),
+            f_max=float(f_max),
+            power=2.0,
+        ).to(self.device)
+        self.db = T.AmplitudeToDB(stype="power").to(self.device)
+        self.cnn = MelCNN(in_channels=1, embed_dim=int(embed_dim)).to(self.device)
+        self.eval()
+
+    @torch.inference_mode()
+    def forward(self, segment: np.ndarray, sr: int) -> torch.Tensor:
+        if sr != self.target_sr:
+            segment = librosa.resample(segment.astype(np.float32), orig_sr=sr, target_sr=self.target_sr)
+            sr = self.target_sr
+
+        wav = torch.from_numpy(segment.astype(np.float32)).to(self.device)
+        wav = wav.unsqueeze(0)  # [1, T]
+
+        mel = self.melspec(wav)  # [1, n_mels, time]
+        mel = self.db(mel)       # log-mel
+
+        # normalizzazione per segmento (stabile tra clip)
+        mel = (mel - mel.mean(dim=-1, keepdim=True)) / (mel.std(dim=-1, keepdim=True).clamp_min(1e-5))
+
+        x = mel.unsqueeze(1)  # [1, 1, n_mels, time]
+        emb = self.cnn(x)     # [1, D]
+        return emb.squeeze(0)
+
+
+# -----------------------------
+# Fusion: concat + MLP (opzione gating in futuro)
+# -----------------------------
+
+class FusionMLP(nn.Module):
+    def __init__(self, w2v_dim: int, mel_dim: int, fused_dim: int = 256):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Linear(w2v_dim + mel_dim, fused_dim),
+            nn.ReLU(inplace=True),
+            nn.Dropout(p=0.1),
+            nn.Linear(fused_dim, fused_dim),
+        )
+
+    def forward(self, e_w2v: torch.Tensor, e_mel: torch.Tensor) -> torch.Tensor:
+        x = torch.cat([e_w2v, e_mel], dim=-1)
+        return self.net(x)
+
+
+# -----------------------------
+# Main extractor (compatibile)
+# -----------------------------
 
 class AudioEmotionExtractor:
-    """
-    Estrae emozioni dall'audio e produce distribuzioni per time-slot.
-    Ora include "speech-only scoring" con VAD semplice basato su RMS energy.
+    """Dual-stream extractor + (opzionale) emotion scoring.
+
+    - Emotion scoring: per default resta il classificatore HF (come prima)
+    - Dual embedding: wav2vec-base embedding + log-mel CNN embedding -> fusion
+
+    Se vuoi usare SOLO l'embedding e non calcolare emozioni:
+    - imposta `emotion_scoring_enabled=False`
+
+    Se vuoi usare emozioni dalla fusion:
+    - implementa/instanzia una head supervisionata e carica checkpoint (non incluso qui).
+
     """
 
     MODEL_TO_EKMAN = {
@@ -24,19 +240,30 @@ class AudioEmotionExtractor:
 
     def __init__(
         self,
-        model_id: str = "r-f/wav2vec-english-speech-emotion-recognition",
+        # --- emotion classifier (legacy) ---
+        emotion_model_id: str = "r-f/wav2vec-english-speech-emotion-recognition",
+        emotion_scoring_enabled: bool = True,
+        # --- embedding streams ---
+        wav2vec_embed_model_id: str = "facebook/wav2vec2-base",
+        mel_embed_dim: int = 256,
+        fused_dim: int = 256,
+        # --- audio params ---
         target_sr: int = 16000,
-        device: int | None = None,
         min_seconds: float = 0.25,
+        device: int | None = None,
         # --- VAD (speech-only scoring) ---
         vad_enabled: bool = True,
-        vad_rms_threshold: float = 0.015,      # soglia RMS (da tarare)
-        vad_fallback_to_neutral: bool = True,  # se False -> {}
-        neutral_fallback_score: float = 1.0,   # usato solo se fallback_to_neutral=True
+        vad_rms_threshold: float = 0.015,
+        vad_fallback_to_neutral: bool = True,
+        neutral_fallback_score: float = 1.0,
         # --- opzionale: gate di confidenza ---
-        confidence_threshold: float | None = None,  
+        confidence_threshold: float | None = None,
+        # --- mel params ---
+        mel_n_mels: int = 80,
+        mel_n_fft: int = 400,
+        mel_hop_length: int = 160,
     ):
-        self.target_sr = target_sr
+        self.target_sr = int(target_sr)
         self.min_seconds = float(min_seconds)
 
         self.vad_enabled = bool(vad_enabled)
@@ -47,16 +274,54 @@ class AudioEmotionExtractor:
         self.confidence_threshold = confidence_threshold if confidence_threshold is None else float(confidence_threshold)
 
         if device is None:
-            device = 0 if torch.cuda.is_available() else -1
+            self.torch_device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+            hf_device = 0 if torch.cuda.is_available() else -1
+        else:
+            # per HF pipeline: device è int (0..n) o -1
+            hf_device = int(device)
+            if hf_device >= 0:
+                self.torch_device = torch.device(f"cuda:{hf_device}")
+            else:
+                self.torch_device = torch.device("cpu")
 
-        self.clf = pipeline(
-            task="audio-classification",
-            model=model_id,
-            framework="pt",
-            device=device,
+        # 1) Emotion scoring (legacy)
+        self.emotion_scoring_enabled = bool(emotion_scoring_enabled)
+        self.clf = None
+        if self.emotion_scoring_enabled:
+            self.clf = pipeline(
+                task="audio-classification",
+                model=emotion_model_id,
+                framework="pt",
+                device=hf_device,
+            )
+
+        # 2) Streams
+        self.w2v_stream = Wav2Vec2EmbeddingStream(
+            model_id=wav2vec_embed_model_id,
+            target_sr=self.target_sr,
+            device=self.torch_device,
+        )
+        self.mel_stream = LogMelStream(
+            target_sr=self.target_sr,
+            n_mels=mel_n_mels,
+            n_fft=mel_n_fft,
+            hop_length=mel_hop_length,
+            embed_dim=int(mel_embed_dim),
+            device=self.torch_device,
         )
 
-    def load_audio(self, audio_path: str) -> tuple[np.ndarray, int]:
+        # 3) Fusion (MLP)
+        # ricavo w2v dim facendo una probe leggera (no forward su audio reale)
+        # NB: AutoModel config ha hidden_size
+        w2v_dim = int(getattr(self.w2v_stream.model.config, "hidden_size", 768))
+        self.fusion = FusionMLP(w2v_dim=w2v_dim, mel_dim=int(mel_embed_dim), fused_dim=int(fused_dim)).to(self.torch_device)
+        self.fusion.eval()  # senza training, lasciamo eval
+
+    # -----------------------------
+    # Audio IO + slicing
+    # -----------------------------
+
+    def load_audio(self, audio_path: str) -> Tuple[np.ndarray, int]:
         audio, sr = librosa.load(audio_path, sr=self.target_sr, mono=True)
         audio = audio.astype(np.float32)
         return audio, sr
@@ -78,59 +343,101 @@ class AudioEmotionExtractor:
 
     @staticmethod
     def _rms(segment: np.ndarray) -> float:
-        """RMS energy su [-1,1] (librosa.load già normalizza tipicamente in quel range)."""
         if segment.size == 0:
             return 0.0
-        # evita overflow e rende robusto
         seg = segment.astype(np.float32)
         return float(np.sqrt(np.mean(seg * seg) + 1e-12))
 
     def _speech_present(self, segment: np.ndarray) -> bool:
-        """
-        VAD semplice: se RMS sopra soglia => probabile parlato/suono utile.
-        """
         if not self.vad_enabled:
             return True
         return self._rms(segment) >= self.vad_rms_threshold
 
-    def _fallback_output(self) -> dict[str, float]:
+    def _fallback_emotions(self) -> Dict[str, float]:
         if self.vad_fallback_to_neutral:
             return {"neutral": float(self.neutral_fallback_score)}
         return {}
 
-    def predict_segment(self, segment: np.ndarray, sr: int) -> dict[str, float]:
-        """
-        Ritorna dizionario emotion->score (rimappato al tuo schema).
-        Applica VAD (speech-only scoring) prima di chiamare il modello.
-        """
-        if segment.size == 0:
-            return self._fallback_output()
+    # -----------------------------
+    # Core: embeddings + emotions
+    # -----------------------------
 
-        # --- speech-only gate ---
-        if not self._speech_present(segment):
-            return self._fallback_output()
+    @torch.inference_mode()
+    def extract_fused_embedding(self, segment: np.ndarray, sr: int) -> np.ndarray:
+        """Return fused embedding as numpy float32 [D]."""
+        if segment.size == 0:
+            # embedding nullo
+            fused_dim = self.fusion.net[-1].out_features if hasattr(self.fusion.net[-1], "out_features") else 256
+            return np.zeros((fused_dim,), dtype=np.float32)
 
         segment = self._pad_if_too_short(segment, sr)
+
+        e_w2v = self.w2v_stream(segment, sr)  # [H]
+        e_mel = self.mel_stream(segment, sr)  # [Dmel]
+
+        e = self.fusion(e_w2v.unsqueeze(0), e_mel.unsqueeze(0)).squeeze(0)
+        e = F.normalize(e, dim=-1)
+        return e.detach().cpu().to(torch.float32).numpy()
+
+    def predict_emotions_legacy(self, segment: np.ndarray, sr: int) -> Dict[str, float]:
+        """Mantiene la vecchia logica di emotion scoring con HF pipeline."""
+        if not self.emotion_scoring_enabled or self.clf is None:
+            return {}
 
         preds = self.clf({"array": segment, "sampling_rate": sr}, top_k=None)
         raw_scores = {p["label"].lower(): float(p["score"]) for p in preds}
 
-        mapped = {}
+        mapped: Dict[str, float] = {}
         for k, v in raw_scores.items():
             if k in self.MODEL_TO_EKMAN:
                 mapped[self.MODEL_TO_EKMAN[k]] = float(v)
 
-        # rinormalizza
         s = sum(mapped.values())
         if s > 0:
             mapped = {k: (v / s) for k, v in mapped.items()}
 
-        # --- opzionale: confidence gating ---
         if self.confidence_threshold is not None and mapped:
             if max(mapped.values()) < self.confidence_threshold:
-                return self._fallback_output()
+                return self._fallback_emotions()
 
         return mapped
+
+    def predict_segment(
+        self,
+        segment: np.ndarray,
+        sr: int,
+        return_embedding: bool = False,
+    ) -> Dict[str, Any]:
+        """Predice per segmento.
+
+        Ritorna:
+        - sempre: dict emotion->score (compatibilità)
+        - opzionale: "embedding" (numpy array) se return_embedding=True
+        """
+        if segment.size == 0:
+            out: Dict[str, Any] = {"emotions": self._fallback_emotions()}
+            if return_embedding:
+                out["embedding"] = self.extract_fused_embedding(segment, sr)
+            return out
+
+        # speech-only gate (se abilitato)
+        if not self._speech_present(segment):
+            out = {"emotions": self._fallback_emotions()}
+            if return_embedding:
+                out["embedding"] = self.extract_fused_embedding(segment, sr)
+            return out
+
+        segment = self._pad_if_too_short(segment, sr)
+
+        emotions = self.predict_emotions_legacy(segment, sr)
+        out2: Dict[str, Any] = {"emotions": emotions}
+        if return_embedding:
+            out2["embedding"] = self.extract_fused_embedding(segment, sr)
+        return out2
+
+    # -----------------------------
+    # Time-slot API
+    # -----------------------------
 
     def predict_per_time_slot(
         self,
@@ -138,20 +445,23 @@ class AudioEmotionExtractor:
         total_ts: int,
         slot_seconds: float = 1.0,
         start_ts: int = 1,
-        context_seconds: float | None = None,  # (opzionale) finestra più lunga
-        centered: bool = True,                  # (opzionale) centrata vs lookback
-    ) -> list[dict]:
-        """
-        Predizione per time-slot (1..total_ts).
-        Con supporto a finestre audio più lunghe.
-        Ora con speech-only scoring integrato.
+        context_seconds: float | None = None,
+        centered: bool = True,
+        return_embedding: bool = False,
+    ) -> List[Dict[str, Any]]:
+        """Predizione per time-slot.
+
+        Output:
+        - default: [{time_slot, emotions}]
+        - con return_embedding=True: [{time_slot, emotions, embedding}]
         """
         audio, sr = self.load_audio(audio_path)
 
-        out = []
-        # calcolo soglia RMS adattiva (se vuoi)
+        out: List[Dict[str, Any]] = []
+
+        # soglia RMS adattiva se richiesta (threshold <= 0)
         if self.vad_enabled and self.vad_rms_threshold <= 0:
-            rms_vals = []
+            rms_vals: List[float] = []
             for ts in range(start_ts, total_ts + 1):
                 s0 = (ts - 1) * slot_seconds
                 s1 = ts * slot_seconds
@@ -159,7 +469,6 @@ class AudioEmotionExtractor:
                 r = self._rms(seg0)
                 if r > 1e-6:
                     rms_vals.append(r)
-
             if rms_vals:
                 self.vad_rms_threshold = float(np.percentile(rms_vals, 65))
 
@@ -178,8 +487,12 @@ class AudioEmotionExtractor:
                     start_s, end_s = base_end_s - context_seconds, base_end_s
 
             seg = self._safe_slice(audio, sr, start_s, end_s)
-            scores = self.predict_segment(seg, sr)
+            pred = self.predict_segment(seg, sr, return_embedding=return_embedding)
 
-            out.append({"time_slot": ts, "emotions": scores})
+            # compatibilità: se return_embedding=False -> emotions dict come prima
+            if return_embedding:
+                out.append({"time_slot": ts, "emotions": pred["emotions"], "embedding": pred["embedding"]})
+            else:
+                out.append({"time_slot": ts, "emotions": pred["emotions"]})
 
         return out

@@ -236,7 +236,9 @@ if __name__ == "__main__":
                 total_ts=len(dati["time_slot"]),
                 slot_seconds=0.5,
                 context_seconds=0.0,   # opzionale, meglio 6.0
-                centered=True          # opzionale
+                centered=True,         # opzionale
+                # --- dual-stream: ritorna anche embedding fuso per time-slot ---
+                return_embedding=True
             )
 
 
@@ -248,8 +250,11 @@ if __name__ == "__main__":
                 context_seconds=6.0,  # audio più lungo
                 spread_k=3            # spalma su 3 slot (ts-1, ts, ts+1)
             )'''
-            # indicizza per lookup rapido
-            audio_emotions_by_ts = {x["time_slot"]: x["emotions"] for x in audio_emotions}
+            # indicizza per lookup rapido (emotions + embedding)
+            audio_emotions_by_ts = {
+                x["time_slot"]: {"emotions": x.get("emotions", {}), "embedding": x.get("embedding", None)}
+                for x in audio_emotions
+            }
 
             for slot in dati["time_slot"]:
 
@@ -365,6 +370,7 @@ if __name__ == "__main__":
 
                 #alla fine i 3 metodi di rpedizione vengono integrati (vedi che manca audio)
                 for fe in face_emotions:
+                    audio_info = audio_emotions_by_ts.get(fe["time_slot"], {"emotions": {}, "embedding": None})
                     text_emotions = next((ts for ts in time_slots_text if ts["ts"] == fe["time_slot"]), None)
                     time_slots.append({
                         "ts": fe["time_slot"],
@@ -374,7 +380,8 @@ if __name__ == "__main__":
                                 "emotions": to_python_float(fe["emotions"])
                             },
                             "audio": {
-                                "emotions": to_python_float(audio_emotions_by_ts.get(fe["time_slot"], {}))
+                                "emotions": to_python_float(audio_info.get("emotions", {})),
+                                "embedding": audio_info.get("embedding", None)
                             },
                             "text": {
                                 "emotions": to_python_float(text_emotions["emotions"]) if text_emotions is not None else {}
@@ -390,6 +397,7 @@ if __name__ == "__main__":
                 gt_ts = build_gt_without_intervals(total_ts_video=len(dati["time_slot"]), video_label= ground_truth_label)
 
                 for fe in face_emotions:
+                    audio_info = audio_emotions_by_ts.get(fe["time_slot"], {"emotions": {}, "embedding": None})
                     time_slots.append({
                         "ts": fe["time_slot"],
                         "ground_truth": gt_ts[fe["time_slot"]],
@@ -398,7 +406,8 @@ if __name__ == "__main__":
                                 "emotions": to_python_float(fe["emotions"])
                             },
                             "audio": {
-                                "emotions": to_python_float(audio_emotions_by_ts.get(fe["time_slot"], {}))
+                                "emotions": to_python_float(audio_info.get("emotions", {})),
+                                "embedding": audio_info.get("embedding", None)
                             },
                             "text": {}    # da integrare
                         }
