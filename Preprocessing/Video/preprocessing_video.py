@@ -95,7 +95,7 @@ class PreprocessingVideo:
 
             # Inizializzazione MediaPipe Face Detection
             mp_face_detection = mp.solutions.face_detection
-            face_detection = mp_face_detection.FaceDetection(min_detection_confidence=0.5)
+            face_detection = mp_face_detection.FaceDetection(min_detection_confidence=0.3)
 
             # FaceMesh
             mp_face_mesh = mp.solutions.face_mesh

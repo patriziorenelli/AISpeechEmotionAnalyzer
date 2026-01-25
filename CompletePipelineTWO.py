@@ -13,6 +13,10 @@ import json
 from Pipeline.Video.newEmotionExtractor import *
 import os
 from Pipeline.Audio.AudioEmotionRecognition import AudioEmotionExtractor
+import gc
+import torch
+import os
+import random
 
 def to_python_float(obj):
     """
@@ -168,6 +172,31 @@ if __name__ == "__main__":
 
     name_list = utils.get_file_list_names(REPO_ID)[0:utils.config["General"]["numVideo"]]
 
+    #-------------------------------------------
+    # DA TOGLIERE PER IL TESTING 
+    
+ 
+    for x in name_list:
+        print(x)
+        print(x.split('-')[2])
+
+
+    filtrati = [
+        s for s in name_list 
+        if s.split('-')[2] != '01'
+    ]
+
+    # 2. Estraiamo 70 elementi casuali
+    # Usiamo min() per evitare errori se i file filtrati sono meno di 70
+    n_da_estrarre = min(len(filtrati), 150)
+    risultato = random.sample(filtrati, n_da_estrarre)
+
+    print(f"File estratti: {len(risultato)}")
+    name_list = risultato
+
+    #------------------------------------------
+
+
     # Crea cartella base
     os.makedirs(config["Paths"]["base_path"], exist_ok=True)
 
@@ -177,7 +206,11 @@ if __name__ == "__main__":
             json.dump({}, f)
 
     logger.info("=== INIZIO PIPELINE COMPLETA ===")
+
+    emotionExtractor = NewEmotionExtractor(model_path="checkpoints/best_model.pt")
+
     for video_name in name_list:
+
 
         face_emotions = []
 
@@ -210,7 +243,7 @@ if __name__ == "__main__":
             json_file_path = os.path.join(
                 visual_file_path, "extractedFaceFrames", "info.json" )
 
-            emotionExtractor = NewEmotionExtractor()  # qui da mettere metodo che sfrutta poi newEmotionExtractor.py per estrarre le emozioni dai frame 
+            #emotionExtractor = NewEmotionExtractor()  # qui da mettere metodo che sfrutta poi newEmotionExtractor.py per estrarre le emozioni dai frame 
 
             with open(json_file_path, "r", encoding="utf-8") as file:
                 dati = json.load(file)
@@ -253,6 +286,9 @@ if __name__ == "__main__":
             )'''
 
             print("------------------------ ANALISI FACCIALE --------------------------")
+
+            logger.info("------------------------ ANALISI FACCIALE --------------------------")
+
             # indicizza per lookup rapido (emotions + embedding)
             audio_emotions_by_ts = {
                 x["time_slot"]: {"emotions": x.get("emotions", {}), "embedding": x.get("embedding", None)}
@@ -263,6 +299,10 @@ if __name__ == "__main__":
 
                 if slot["valid"]:
                     print(f"TS: {slot['ts']}")
+
+                    # Richiamiamo il garbage collector ogni 5 time-slot per liberare memoria
+                    if slot['ts'] % 5 == 0:
+                        gc.collect()
 
                     frames_number = len(slot["frames"])
                     #print("Frame analizzati:", frames_number)
@@ -277,11 +317,18 @@ if __name__ == "__main__":
                         "surprise": 0.0
                     }
 
+                    emotions = list(total.keys())
+
                     for frame in slot["frames"]:
                         frame_val = cv2.imread(frames_path + frame)
 
                         all_detected_emotion =  emotionExtractor.extractFaceEmotion(image= frame_val) # pure qua usare nuova classe forse serve castina emozioni
-                        emotions = list(total.keys())
+
+                        if all_detected_emotion is None: # Caso limite in cui sul frame pre-processato face_mesh non riesce a trovare il volto
+                            all_detected_emotion = torch.tensor([0.1429, 0.1429, 0.1429, 0.1429, 0.1429, 0.1429, 0.1429])
+    
+                        #print(all_detected_emotion)
+                        #print(all_detected_emotion.size())
                         all_detected_emotion_dict = { emotions[i]: all_detected_emotion[i].item() for i in range(len(emotions))  }
 
                         for k, v in all_detected_emotion_dict.items():
@@ -396,7 +443,8 @@ if __name__ == "__main__":
                             }    # da integrare
                         }
                     })
-            
+                gc.collect()
+
             #caso altro dataset
             else:
                 time_slots = []
@@ -423,6 +471,8 @@ if __name__ == "__main__":
                             "text": {}    # da integrare
                         }
                     })
+                gc.collect()
+
 
             # Aggiorno il file di info.json con gli score raccolti
             with open(complete_info_path, "r", encoding="utf-8") as f:

@@ -257,52 +257,46 @@ class EmotionTrainer:
                 print(f"🔥 NEW BEST MODEL | ValAcc={best_acc:.3f}")
 
 class NewEmotionExtractor:
+    def __init__(self, model_path):
+        self.pipeline = FaceGraphPipeline()
 
-    # https://arxiv.org/pdf/2311.02910 per emozioni di RAF-DB
-
-    def extractFaceEmotion( self, image,return_all=True,model_path="checkpoints/best_model.pt"):
-        pipeline = FaceGraphPipeline()
-        model = EmotionGATv2(num_node_features=5, num_classes=7)
+        self.model = EmotionGATv2(
+            num_node_features=5,
+            num_classes=7
+        )
 
         ckpt = torch.load(model_path, map_location="cpu")
-        model.load_state_dict(ckpt["model_state"])
-        model.eval()
+        self.model.load_state_dict(ckpt["model_state"])
+        self.model.eval()
+
         print(f"[INFERENCE] Modello caricato da {model_path}")
 
-        # --------------------------------------------------
-        # Face detection
-        # --------------------------------------------------
-        results = pipeline.mp_face_mesh.process(image)
+    def extractFaceEmotion(self, image, return_all=True):
+        results = self.pipeline.mp_face_mesh.process(image)
+
         if not results.multi_face_landmarks:
-            print("[INFERENCE] Nessun volto rilevato")
             return None
 
-        landmarks = np.array([  [lm.x, lm.y, lm.z] for lm in results.multi_face_landmarks[0].landmark ])
+        landmarks = np.array([
+            [lm.x, lm.y, lm.z]
+            for lm in results.multi_face_landmarks[0].landmark
+        ])
 
-        # --------------------------------------------------
-        # Graph construction
-        # --------------------------------------------------
-        x = pipeline.normalize_landmarks(landmarks)          # [N, 5]
-        edge_index = pipeline.get_delaunay_edges(landmarks)  # [2, E]
+        x = self.pipeline.normalize_landmarks(landmarks)
+        edge_index = self.pipeline.get_delaunay_edges(landmarks)
 
         data = Data(x=x, edge_index=edge_index)
-
-        # batch fittizio (tutti i nodi appartengono allo stesso grafo)
         batch = torch.zeros(data.x.size(0), dtype=torch.long)
 
-        # --------------------------------------------------
-        # Inference
-        # --------------------------------------------------
         with torch.no_grad():
-            logits = model(data.x, data.edge_index, batch)
+            logits = self.model(data.x, data.edge_index, batch)
+            probs = torch.softmax(logits, dim=1)
 
-            if return_all:
-                probs = torch.softmax(logits, dim=1)
-                print(probs.squeeze(0))
-                return probs.squeeze(0)   # [7]
-            else:
-                pred = logits.argmax(dim=1)
-                return pred.item()
+        # libera riferimenti
+        del data, batch, logits
+        #print(probs)
+        #print(probs.size())
+        return probs.squeeze(0)
 
 
 
