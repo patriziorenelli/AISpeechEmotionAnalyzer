@@ -154,8 +154,8 @@ if __name__ == "__main__":
 
     logger = utils.setup_logger()
     
-    #REPO_ID = "PiantoDiGruppo/Ravdess_AML"
-    REPO_ID = "PiantoDiGruppo/OMGEmotion_AML"
+    REPO_ID = "PiantoDiGruppo/Ravdess_AML"
+    #REPO_ID = "PiantoDiGruppo/OMGEmotion_AML"
 
     text_model = "Emoberta"
     dataset_train_text = "Goemotions"
