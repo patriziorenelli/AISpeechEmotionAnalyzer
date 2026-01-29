@@ -10,16 +10,13 @@ from Preprocessing.Video.preprocessing_video import *
 import shutil
 import math
 import json
-from Pipeline.Video.newEmotionExtractor import *
+from Pipeline.Video.newEmotionExtractor_ottimale import *
 import os
 from Pipeline.Audio.AudioEmotionRecognition import AudioEmotionExtractor
 import gc
 import torch
 import os
 import random
-
-
-# BISOGNA FARE UN ALTRO FILE DI QUESTO E UN ALTRO newEMotionExtractor.py CHE USA IL NUOVO MODELLO, METTENDO LA STESSA CLASSE DI GAT USATA IN TEST
 
 
 def to_python_float(obj):
@@ -179,8 +176,8 @@ if __name__ == "__main__":
     #-------------------------------------------
     # DA TOGLIERE PER IL TESTING 
     
- 
-    for x in name_list:
+    """
+     for x in name_list:
         print(x)
         print(x.split('-')[2])
 
@@ -197,6 +194,8 @@ if __name__ == "__main__":
 
     print(f"File estratti: {len(risultato)}")
     name_list = risultato
+    """
+
 
     #------------------------------------------
 
