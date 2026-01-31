@@ -1,3 +1,4 @@
+from Pipeline.FeedbackCoach import FeedbackCoach
 from Pipeline.Testo.test_omgdataset import pred_emo_from_omgdataset
 from Pipeline.Video.newEmotionExtractor import NewEmotionExtractor
 from Preprocessing.Testo.omgdataset_preprocess import preprocess_omgdataset_dataset_single_audio
@@ -149,6 +150,34 @@ def merge_time_slots(
 
     return time_slots
 
+def generate_feedback_for_all_videos(complete_info_path: str) -> dict:
+    """
+    Legge il JSON finale della pipeline e genera feedback testuale
+    per ogni video.
+    """
+
+    with open(complete_info_path, "r", encoding="utf-8") as f:
+        complete_info = json.load(f)
+
+    coach = FeedbackCoach()
+    feedback_results = {}
+
+    for video_name, video_data in complete_info.items():
+        time_slots = video_data["time_slots"]
+
+        stream_scores = {
+            "video": coach.aggregate_stream_scores(time_slots, "video"),
+            "audio": coach.aggregate_stream_scores(time_slots, "audio"),
+            "text": coach.aggregate_stream_scores(time_slots, "text"),
+            # opzionale: se in futuro aggiungi fusione
+            "fusion": coach.aggregate_stream_scores(time_slots, "fusion")
+        }
+
+        feedback_text = coach.generate_full_feedback(stream_scores)
+
+        feedback_results[video_name] = feedback_text
+
+    return feedback_results
 
 if __name__ == "__main__":
 
@@ -524,6 +553,18 @@ if __name__ == "__main__":
             #if vid_name == "1v6f9b2KMRA.mp4":
             #   break
 
+    feedback_results = generate_feedback_for_all_videos(complete_info_path=complete_info_path)
+
+    with open(complete_info_path, "r", encoding="utf-8") as f:
+        complete_info = json.load(f)
+
+    for video_name, feedback_text in feedback_results.items():
+        if video_name in complete_info:
+            complete_info[video_name]["feedback"] = feedback_text
+
+    with open(complete_info_path, "w", encoding="utf-8") as f:
+        json.dump(complete_info, f, indent=4, ensure_ascii=False)
+
     # Calcolo le metriche per ogni stream
     stream_names = ["audio", "video", "text"]
 
@@ -531,4 +572,3 @@ if __name__ == "__main__":
         evaluation_manager.evaluate_stream(stream_name=stream, video_name_list=name_list)
 
     evaluation_manager.evaluate_fusion(stream_names=stream_names, video_name_list=name_list)
-

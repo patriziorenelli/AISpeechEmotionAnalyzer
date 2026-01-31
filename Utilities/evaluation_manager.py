@@ -135,7 +135,8 @@ class EvaluationManager:
                 f"F1: {metrics['f1_score']:.3f} |"
                 f"TCS: {metrics['tcs']:.3f} | "
                 f"Prec: {metrics['precision']:.3f} | "
-                f"Recall: {metrics['recall']:.3f}"
+                f"Recall: {metrics['recall']:.3f} | " 
+                f"Feedback: { result_json[video_name].get('feedback', 'N/A') }"
             )
 
         # =============================
