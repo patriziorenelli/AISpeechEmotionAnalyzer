@@ -259,11 +259,29 @@ if __name__ == "__main__":
 
             #la mia bellissima classe
             #ora imp-lementa VAD per ignorare il non parlato
+            ''' OMG
             audioExtractor = AudioEmotionExtractor(
-                vad_enabled=False,
+                vad_enabled=True,
                 vad_rms_threshold=0.015,          # da tarare
-                vad_fallback_to_neutral=False,     # oppure False per {}, FALSE NON FUNZIONA
-                confidence_threshold=0.05         # opzionale: es. 0.45
+                vad_fallback_to_neutral=True,     # oppure False per {}, FALSE NON FUNZIONA
+                confidence_threshold=0.25         # pare andare bene cosí
+            )
+            audio_emotions = audioExtractor.predict_per_time_slot(
+                audio_path=audio_file_path,
+                total_ts=len(dati["time_slot"]),
+                slot_seconds=2.0,
+                context_seconds=6.0,   # opzionale, meglio 6.0
+                centered=True,         # opzionale
+                # --- dual-stream: ritorna anche embedding fuso per time-slot ---
+                return_embedding=False #non ritorno piú i time slots
+            )
+            '''
+
+            audioExtractor = AudioEmotionExtractor(
+                vad_enabled=True,
+                vad_rms_threshold=0.015,          # da tarare
+                vad_fallback_to_neutral=True,     # oppure False per {}, FALSE NON FUNZIONA
+                confidence_threshold=0.1         # pare andare bene cosí
             )
 
             #dovrebbe andare bene
@@ -271,11 +289,11 @@ if __name__ == "__main__":
             audio_emotions = audioExtractor.predict_per_time_slot(
                 audio_path=audio_file_path,
                 total_ts=len(dati["time_slot"]),
-                slot_seconds=0.5,
-                context_seconds=0.0,   # opzionale, meglio 6.0
+                slot_seconds=1.0,
+                context_seconds=2.0,   # opzionale
                 centered=True,         # opzionale
                 # --- dual-stream: ritorna anche embedding fuso per time-slot ---
-                return_embedding=True
+                return_embedding=False #non ritorno piú i time slots
             )
 
 
@@ -293,8 +311,14 @@ if __name__ == "__main__":
             logger.info("------------------------ ANALISI FACCIALE --------------------------")
 
             # indicizza per lookup rapido (emotions + embedding)
+            '''
+            per non indicizzare gli embedding nel file json finale
             audio_emotions_by_ts = {
                 x["time_slot"]: {"emotions": x.get("emotions", {}), "embedding": x.get("embedding", None)}
+                for x in audio_emotions
+            }'''
+            audio_emotions_by_ts = {
+                x["time_slot"]: {"emotions": x.get("emotions", {})}
                 for x in audio_emotions
             }
 
@@ -425,11 +449,12 @@ if __name__ == "__main__":
 
                 #alla fine i 3 metodi di rpedizione vengono integrati (vedi che manca audio)
                 for fe in face_emotions:
-                    audio_info = audio_emotions_by_ts.get(fe["time_slot"], {"emotions": {}, "embedding": None})
+                    #audio_info = audio_emotions_by_ts.get(fe["time_slot"], {"emotions": {}, "embedding": None})
+                    audio_info = audio_emotions_by_ts.get(fe["time_slot"], {"emotions": {}})
                     text_emotions = next((ts for ts in time_slots_text if ts["ts"] == fe["time_slot"]), None)
-                    emb = audio_info.get("embedding", None)
-                    if emb is not None:
-                        emb = emb.tolist()   # ndarray -> list (serializzabile JSON)
+                    #emb = audio_info.get("embedding", None)
+                    #if emb is not None:
+                        #emb = emb.tolist()   # ndarray -> list (serializzabile JSON)
                     time_slots.append({
                         "ts": fe["time_slot"],
                         "ground_truth": text_emotions["ground_truth"] if text_emotions is not None else None,
@@ -439,7 +464,6 @@ if __name__ == "__main__":
                             },
                             "audio": {
                                 "emotions": to_python_float(audio_info.get("emotions", {})),
-                                "embedding": emb
                             },
                             "text": {
                                 "emotions": to_python_float(text_emotions["emotions"]) if text_emotions is not None else {}
@@ -456,10 +480,12 @@ if __name__ == "__main__":
                 gt_ts = build_gt_without_intervals(total_ts_video=len(dati["time_slot"]), video_label= ground_truth_label)
 
                 for fe in face_emotions:
-                    audio_info = audio_emotions_by_ts.get(fe["time_slot"], {"emotions": {}, "embedding": None})
-                    emb = audio_info.get("embedding", None)
-                    if emb is not None:
-                        emb = emb.tolist()
+
+                    audio_info = audio_emotions_by_ts.get(fe["time_slot"], {"emotions": {}})
+                    #audio_info = audio_emotions_by_ts.get(fe["time_slot"], {"emotions": {}, "embedding": None})
+                    #emb = audio_info.get("embedding", None)
+                    #if emb is not None:
+                        #emb = emb.tolist()
                     time_slots.append({
                         "ts": fe["time_slot"],
                         "ground_truth": gt_ts[fe["time_slot"]],
@@ -469,7 +495,6 @@ if __name__ == "__main__":
                             },
                             "audio": {
                                 "emotions": to_python_float(audio_info.get("emotions", {})),
-                                "embedding": emb
                             },
                             "text": {}    # da integrare
                         }
