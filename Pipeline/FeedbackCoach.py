@@ -4,7 +4,7 @@ from Utilities.feedback_utilities import BASE_TEMPLATE_EN, EMOTION_LABELS_EN
 
 
 class FeedbackCoach:
-    def aggregate_stream_scores(time_slots: list, stream_name: str) -> dict[str, float]:
+    def aggregate_stream_scores(self, time_slots: list, stream_name: str) -> dict[str, float]:
         emotion_values = defaultdict(list)
 
         for ts in time_slots:
@@ -25,7 +25,7 @@ class FeedbackCoach:
             for emotion, scores in emotion_values.items()
         }
 
-    def analyze_score_vector(self, score_vector: dict[str, float]):
+    def analyze_score_vector(self, score_vector: dict[str, float]) -> dict | None:
         if not score_vector:
             return None
 

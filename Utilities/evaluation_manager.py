@@ -1,6 +1,7 @@
 import pandas as pd
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 import numpy as np
+from Pipeline.FeedbackCoach import FeedbackCoach
 from Utilities.utils import Utils
 
 class EvaluationManager:
@@ -135,8 +136,8 @@ class EvaluationManager:
                 f"F1: {metrics['f1_score']:.3f} |"
                 f"TCS: {metrics['tcs']:.3f} | "
                 f"Prec: {metrics['precision']:.3f} | "
-                f"Recall: {metrics['recall']:.3f} | " 
-                f"Feedback: { result_json[video_name].get('feedback', 'N/A') }"
+                f"Recall: {metrics['recall']:.3f} | \n" 
+                f"Feedback: \n{ result_json[video_name].get('feedback', 'N/A') }"
             )
 
         # =============================
@@ -244,6 +245,7 @@ class EvaluationManager:
         """
 
         logger = self.utils.setup_logger()
+        coach = FeedbackCoach()
         logger.info(f"Evaluating fusion of streams: {stream_names}")
 
         result_json = pd.read_json(
@@ -300,12 +302,15 @@ class EvaluationManager:
 
             video_metrics.append(metrics)
 
+            fusion_feedback = coach.generate_stream_feedback(fused_emotions, "Fusion")
+
             logger.info(
                 f"[Fusion] {video_name} | "
                 f"Acc: {metrics['accuracy']:.3f} | "
                 f"F1: {metrics['f1_score']:.3f} | "
                 f"Prec: {metrics['precision']:.3f} | "
-                f"Recall: {metrics['recall']:.3f}"
+                f"Recall: {metrics['recall']:.3f} | \n"
+                f"Feedback: {fusion_feedback}"
             )
 
         # =============================

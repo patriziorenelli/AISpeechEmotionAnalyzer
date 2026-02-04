@@ -169,8 +169,6 @@ def generate_feedback_for_all_videos(complete_info_path: str) -> dict:
             "video": coach.aggregate_stream_scores(time_slots, "video"),
             "audio": coach.aggregate_stream_scores(time_slots, "audio"),
             "text": coach.aggregate_stream_scores(time_slots, "text"),
-            # opzionale: se in futuro aggiungi fusione
-            "fusion": coach.aggregate_stream_scores(time_slots, "fusion")
         }
 
         feedback_text = coach.generate_full_feedback(stream_scores)
@@ -189,8 +187,8 @@ if __name__ == "__main__":
 
     logger = utils.setup_logger()
     
-    REPO_ID = "PiantoDiGruppo/Ravdess_AML"
-    #REPO_ID = "PiantoDiGruppo/OMGEmotion_AML"
+    #REPO_ID = "PiantoDiGruppo/Ravdess_AML"
+    REPO_ID = "PiantoDiGruppo/OMGEmotion_AML"
 
     text_model = "Emoberta"
     dataset_train_text = "Goemotions"
