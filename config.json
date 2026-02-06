@@ -4,7 +4,7 @@
         "Version": "1.0.0",
         "DebugMode": true,
         "temp_audio_name": "originalAudio.wav",
-        "numVideo": 25
+        "numVideo": 1
     },
     "Dataset": {
         "Ravdess": {

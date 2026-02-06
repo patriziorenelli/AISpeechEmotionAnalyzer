@@ -1,6 +1,5 @@
 from Pipeline.FeedbackCoach import FeedbackCoach
 from Pipeline.Testo.test_omgdataset import pred_emo_from_omgdataset
-from Pipeline.Video.newEmotionExtractor import NewEmotionExtractor
 from Preprocessing.Testo.omgdataset_preprocess import preprocess_omgdataset_dataset_single_audio
 from Utilities.evaluation_manager import EvaluationManager
 from Utilities.transcription_manager import TranscriptionManager
@@ -187,8 +186,8 @@ if __name__ == "__main__":
 
     logger = utils.setup_logger()
     
-    #REPO_ID = "PiantoDiGruppo/Ravdess_AML"
-    REPO_ID = "PiantoDiGruppo/OMGEmotion_AML"
+    REPO_ID = "PiantoDiGruppo/Ravdess_AML"
+    #REPO_ID = "PiantoDiGruppo/OMGEmotion_AML"
 
     text_model = "Emoberta"
     dataset_train_text = "Goemotions"

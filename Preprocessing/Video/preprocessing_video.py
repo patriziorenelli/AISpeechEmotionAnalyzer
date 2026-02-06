@@ -280,7 +280,6 @@ def preprocessing_video(video_path: str) -> int:
 from datasets import load_dataset
 from huggingface_hub import login
 
-login(token="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")
 
 ds = load_dataset(
     "PiantoDiGruppo/AMLDataset2",
