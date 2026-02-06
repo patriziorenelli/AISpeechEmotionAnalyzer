@@ -353,11 +353,17 @@ class AudioEmotionExtractor:
             return True
         return self._rms(segment) >= self.vad_rms_threshold
 
+    '''
     def _fallback_emotions(self) -> Dict[str, float]:
         if self.vad_fallback_to_neutral:
             return {"neutral": float(self.neutral_fallback_score)}
         return {}
-
+    '''
+    def _fallback_emotions(self):
+        # fallback uniforme su 7 emozioni EKMAN
+        keys = ["neutral","surprise","fear","sadness","joy","anger","disgust"]
+        u = 1.0 / len(keys)
+        return {k: u for k in keys}
     # -----------------------------
     # Core: embeddings + emotions
     # -----------------------------

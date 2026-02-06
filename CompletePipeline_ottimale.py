@@ -160,8 +160,8 @@ if __name__ == "__main__":
 
     logger = utils.setup_logger()
     
-    REPO_ID = "PiantoDiGruppo/Ravdess_AML"
-    #REPO_ID = "PiantoDiGruppo/OMGEmotion_AML"
+    #REPO_ID = "PiantoDiGruppo/Ravdess_AML"
+    REPO_ID = "PiantoDiGruppo/OMGEmotion_AML"
 
     text_model = "Emoberta"
     dataset_train_text = "Goemotions"
@@ -259,11 +259,11 @@ if __name__ == "__main__":
 
             #la mia bellissima classe
             #ora imp-lementa VAD per ignorare il non parlato
-            ''' OMG
+            
             audioExtractor = AudioEmotionExtractor(
                 vad_enabled=True,
                 vad_rms_threshold=0.015,          # da tarare
-                vad_fallback_to_neutral=True,     # oppure False per {}, FALSE NON FUNZIONA
+                vad_fallback_to_neutral=False,     # oppure False per {}, FALSE NON FUNZIONA
                 confidence_threshold=0.25         # pare andare bene cosí
             )
             audio_emotions = audioExtractor.predict_per_time_slot(
@@ -275,12 +275,12 @@ if __name__ == "__main__":
                 # --- dual-stream: ritorna anche embedding fuso per time-slot ---
                 return_embedding=False #non ritorno piú i time slots
             )
+            
             '''
-
             audioExtractor = AudioEmotionExtractor(
-                vad_enabled=True,
+                vad_enabled=False,
                 vad_rms_threshold=0.015,          # da tarare
-                vad_fallback_to_neutral=True,     # oppure False per {}, FALSE NON FUNZIONA
+                vad_fallback_to_neutral=False,     # oppure False per {}, FALSE NON FUNZIONA
                 confidence_threshold=0.1         # pare andare bene cosí
             )
 
@@ -295,7 +295,7 @@ if __name__ == "__main__":
                 # --- dual-stream: ritorna anche embedding fuso per time-slot ---
                 return_embedding=False #non ritorno piú i time slots
             )
-
+            '''
 
             '''
             audio_emotions = audioExtractor.predict_per_time_slot_spread(
